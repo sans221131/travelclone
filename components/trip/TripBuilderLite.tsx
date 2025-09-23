@@ -18,10 +18,10 @@ import {
 
 /* ---------------- Types ---------------- */
 type Answers = {
-  from?: string;            // "City, Country"
-  destination?: string;     // "City, Country"
-  startDate?: string;       // ISO yyyy-mm-dd
-  endDate?: string;         // ISO yyyy-mm-dd
+  from?: string; // "City, Country"
+  destination?: string; // "City, Country"
+  startDate?: string; // ISO yyyy-mm-dd
+  endDate?: string; // ISO yyyy-mm-dd
   adults?: number;
   children?: number;
 
@@ -89,15 +89,12 @@ function fmtDate(iso?: string) {
 }
 
 // map labels like "Dubai, UAE" or "Dubai" back to canonical label
-const DESTINATION_LABEL_TO_ID = DESTINATIONS.reduce<Record<string, string>>(
-  (acc, dest) => {
-    acc[dest.toLowerCase()] = dest;
-    const city = dest.split(",")[0].toLowerCase();
-    acc[city] = dest;
-    return acc;
-  },
-  {}
-);
+const DESTINATION_LABEL_TO_ID = DESTINATIONS.reduce<Record<string, string>>((acc, dest) => {
+  acc[dest.toLowerCase()] = dest;
+  const city = dest.split(",")[0].toLowerCase();
+  acc[city] = dest;
+  return acc;
+}, {});
 
 function destinationSlugFromLabel(label?: string) {
   if (!label) return undefined;
@@ -111,42 +108,18 @@ function destinationSlugFromLabel(label?: string) {
   return undefined;
 }
 
-/* Quick date presets for true one-click on desktop too */
-function addDays(base: Date, days: number) {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-function iso(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
-function nextSaturday(from = new Date()) {
-  const d = new Date(from);
-  const day = d.getDay(); // 0 Sun .. 6 Sat
-  const delta = (6 - day + 7) % 7 || 7;
-  return addDays(d, delta);
-}
-function weekendEscape(): [string, string] {
-  const start = nextSaturday();
-  const end = addDays(start, 1); // Sat-Sun
-  return [iso(start), iso(end)];
-}
-function nextNights(n: number): [string, string] {
-  const start = addDays(new Date(), 7); // one week from today, civilized
-  const end = addDays(start, n);
-  return [iso(start), iso(end)];
-}
-
 /* ---------------- Component ---------------- */
 export default function TripBuilderLite() {
   const router = useRouter();
 
   const [idx, setIdx] = useState(0);
+  const [maxVisited, setMaxVisited] = useState(0); // allow pip jump back, not forward
   const [answers, setAnswers] = useState<Answers>({
     adults: 1,
     children: 0,
     // seededDestination: "Dubai, UAE",
     seedPromptShown: false,
+    phoneCountryCode: "+91",
   });
 
   // Determine current step, but skip destinationSeed if nothing is seeded
@@ -211,15 +184,11 @@ export default function TripBuilderLite() {
       case "fromLocation":
         return !!answers.from;
       case "destinationSeed":
-        return true; // user will click Keep/Change buttons
+        return true; // user will click keep/change buttons
       case "destinationSelect":
         return !!answers.destination;
       case "dates":
-        return Boolean(
-          answers.startDate &&
-            answers.endDate &&
-            answers.startDate <= answers.endDate
-        );
+        return Boolean(answers.startDate && answers.endDate && answers.startDate <= answers.endDate);
       case "travellers":
         return (answers.adults ?? 0) >= 1 && (answers.children ?? 0) >= 0;
       case "passengerName":
@@ -254,21 +223,31 @@ export default function TripBuilderLite() {
     // special routing to mirror receipt flow nuances
     if (current === "fromLocation") {
       const next = answers.seededDestination ? "destinationSeed" : "destinationSelect";
-      setIdx(steps.indexOf(next));
+      const to = steps.indexOf(next);
+      setIdx(to);
+      setMaxVisited((v) => Math.max(v, to));
       return;
     }
     if (current === "destinationSeed") {
-      // user must click Keep/Change buttons; Next just guards
       return;
     }
-    setIdx((i) => Math.min(i + 1, steps.length - 1));
+    setIdx((i) => {
+      const ni = Math.min(i + 1, steps.length - 1);
+      setMaxVisited((v) => Math.max(v, ni));
+      return ni;
+    });
   }
 
   function goPrev() {
     setIdx((i) => Math.max(i - 1, 0));
   }
 
-  // Focus management - focus the question when the section is in view
+  // Allow jumping via pips to any visited step
+  function jumpTo(i: number) {
+    if (i <= maxVisited) setIdx(i);
+  }
+
+  // Focus management - only focus if user is already within the trip builder section
   const questionRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const tripBuilderSection = document.getElementById("trip-builder");
@@ -281,22 +260,9 @@ export default function TripBuilderLite() {
     }
   }, [current]);
 
-  // Small helpers
-  function setAndAdvance<K extends keyof Answers>(key: K, value: Answers[K]) {
+  // Simple setter without auto-advance
+  function setAnswer<K extends keyof Answers>(key: K, value: Answers[K]) {
     setAnswers((a) => ({ ...a, [key]: value }));
-    // one-tap auto-advance for choice steps
-    const shouldAutoAdvance = [
-      "fromLocation",
-      "destinationSelect",
-      "nationality",
-      "airline",
-      "hotel",
-      "flightClass",
-      "visa",
-    ].includes(current);
-    if (shouldAutoAdvance) {
-      setTimeout(() => goNext(), 160);
-    }
   }
 
   // "Keep seeded destination?" actions
@@ -310,14 +276,20 @@ export default function TripBuilderLite() {
     }));
     const to = steps.indexOf("dates");
     if (to >= 0) {
-      setTimeout(() => setIdx(to), 120);
+      setTimeout(() => {
+        setIdx(to);
+        setMaxVisited((v) => Math.max(v, to));
+      }, 100);
     }
   }
   function changeDestination() {
     setAnswers((a) => ({ ...a, seededDestination: undefined, seedPromptShown: true }));
     const to = steps.indexOf("destinationSelect");
     if (to >= 0) {
-      setTimeout(() => setIdx(to), 120);
+      setTimeout(() => {
+        setIdx(to);
+        setMaxVisited((v) => Math.max(v, to));
+      }, 100);
     }
   }
 
@@ -372,377 +344,313 @@ export default function TripBuilderLite() {
     }
   }
 
-  /* -------------- UI labels -------------- */
-  const stepTitle = {
-    fromLocation: "Where are you traveling from?",
-    destinationSeed: "Keep suggested destination?",
-    destinationSelect: "Pick a destination",
-    dates: "When do you plan to travel?",
-    travellers: "How many travelers?",
-    passengerName: "Passenger name",
-    phoneNumber: "Best phone number",
-    email: "Email for your itinerary",
-    nationality: "Your nationality",
-    airline: "Airline preference",
-    hotel: "Hotel preference",
-    flightClass: "Flight class",
-    visa: "Visa status",
-    summary: "Review and submit",
-  } as const;
+  // Basic swipe navigation for mobile
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+  function onTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.changedTouches[0].clientX;
+    touchEndX.current = null;
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    touchEndX.current = e.changedTouches[0].clientX;
+  }
+  function onTouchEnd() {
+    if (touchStartX.current == null || touchEndX.current == null) return;
+    const dx = touchEndX.current - touchStartX.current;
+    if (Math.abs(dx) > 48) {
+      if (dx > 0) goPrev();
+      else if (canProceed()) goNext();
+    }
+  }
 
   return (
     <section
       id="trip-builder"
       aria-labelledby="tripbuilder-heading"
-      className="relative isolate w-full bg-zinc-950 text-zinc-100"
+      className="relative isolate w-full bg-zinc-950 text-zinc-100 overflow-x-hidden"
+      // dvh avoids iOS URL bar jump; safe-area padding improves tap targets
+      style={{
+        paddingBottom: "max(env(safe-area-inset-bottom, 0px), 16px)",
+      }}
     >
-      {/* Background vignette + subtle linear glow */}
+      {/* Vignette + linear glow */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 [background:radial-gradient(1200px_500px_at_20%_-10%,rgba(255,255,255,0.08)_0%,transparent_60%)]"
       />
-      <div className="absolute inset-x-0 top-1/2 -z-10 h-28 overflow-hidden pointer-events-none">
-        <div className="glowbar mx-auto h-28 w-[135%]" />
+      <div className="absolute inset-x-0 top-1/2 -z-10 h-32 overflow-hidden pointer-events-none">
+        <div className="glowbar mx-auto h-32 w-[135%]" />
       </div>
 
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-10 border-b border-white/10 bg-zinc-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-3">
-          <h2 id="tripbuilder-heading" className="text-lg font-semibold text-white sm:text-xl">
-            Trip Builder Lite
-          </h2>
-          <div className="ml-auto flex items-center gap-3">
-            <span className="text-xs text-zinc-400">
-              Step {idx + 1} of {steps.length}
-            </span>
-          </div>
-        </div>
-        <ProgressBar total={steps.length} index={idx} />
-      </header>
+      <div className="mx-auto grid max-w-4xl place-items-center px-3 pt-12 pb-[108px] sm:px-4 sm:pt-16 md:pt-18">
+        <h2
+          id="tripbuilder-heading"
+          className="mb-4 text-center text-xl font-semibold tracking-tight text-white sm:mb-6 sm:text-2xl md:text-3xl"
+        >
+          Trip Builder Lite
+        </h2>
 
-      {/* Main Canvas */}
-      <div className="mx-auto max-w-4xl px-4 pb-24 pt-4 sm:pt-6 md:pb-28">
-        <div className="relative rounded-2xl border border-white/12 bg-zinc-950/60 p-0.5 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
-          <div className="relative rounded-2xl bg-zinc-950/70">
+        <div className="relative w-full rounded-2xl border border-white/10 bg-gradient-to-b from-zinc-950/60 to-zinc-900/60 p-0.5 backdrop-blur">
+          <div className="relative rounded-2xl bg-zinc-950/60 p-3 sm:p-4 md:p-6">
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10 [box-shadow:0_0_0_1px_rgba(255,255,255,0.05),0_0_40px_2px_rgba(180,180,255,0.08)_inset]"
+              className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10 [box-shadow:0_0_0_1px_rgba(255,255,255,0.04),0_0_40px_2px_rgba(180,180,255,0.08)_inset]"
             />
 
-            {/* Question card */}
-            <div className="px-4 py-5 sm:px-6 sm:py-7">
-              <div className="mx-auto grid w-full max-w-2xl gap-5">
-                <div className="card">
-                  <header className="mb-3">
-                    <h3 className="text-2xl font-semibold text-white sm:text-3xl">
-                      {stepTitle[current]}
-                    </h3>
-                    <p className="mt-1 text-sm text-zinc-400">
-                      {current === "fromLocation" && "Major cities with airports"}
-                      {current === "destinationSeed" && "You can change it if needed"}
-                      {current === "destinationSelect" && "We’ll refine specifics after you submit"}
-                      {current === "dates" && "Select your dates or pick a preset"}
-                      {current === "travellers" && "Pick a preset or edit counts"}
-                      {current === "passengerName" && "Full legal name as on passport"}
-                      {current === "phoneNumber" && "Include your country code"}
-                      {current === "email" && "We send your draft itinerary there"}
-                      {current === "nationality" && "Used for visa rules"}
-                      {current === "airline" && "Optional, helps us shortlist"}
-                      {current === "hotel" && "Preferred star level or brand type"}
-                      {current === "flightClass" && "We’ll price across cabins"}
-                      {current === "visa" && "Tell us where you stand right now"}
-                      {current === "summary" && "Double-check before submitting"}
-                    </p>
-                  </header>
+            {/* Progress (clickable for visited steps) */}
+            <ProgressPips
+              total={steps.length}
+              index={idx}
+              onJump={jumpTo}
+              maxVisited={maxVisited}
+            />
 
-                  {/* Content boxes per step */}
-                  <div className="grid w-full gap-5">
-                    {current === "fromLocation" && (
-                      <ChoiceGridBig
+            {/* Fixed-size question box, responsive to viewport */}
+            <div className="mx-auto mt-3 w-full max-w-2xl sm:mt-4 md:mt-6">
+              <div
+                ref={questionRef}
+                tabIndex={-1}
+                aria-live="polite"
+                onTouchStart={onTouchStart}
+                onTouchMove={onTouchMove}
+                onTouchEnd={onTouchEnd}
+                className={[
+                  "relative rounded-xl border border-white/10 bg-white/5 p-3 sm:p-4 md:p-5",
+                  "overflow-y-auto hide-scrollbar overscroll-contain",
+                  "pb-24",
+                ].join(" ")}
+                style={{
+                  minHeight: "min(70dvh, 500px)",
+                  maxHeight: "min(78dvh, 620px)",
+                }}
+              >
+                <div className="grid w-full gap-6">
+                  {current === "fromLocation" && (
+                    <StepShell title="Where are you traveling from?" subtitle="Major cities with airports">
+                      <ChoiceGrid
                         options={ORIGIN_CITIES}
                         value={answers.from}
-                        onChange={(v) => setAndAdvance("from", v)}
+                        onChange={(v) => setAnswer("from", v)}
                       />
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "destinationSeed" && answers.seededDestination && (
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <BigButton onClick={keepSeeded} variant="primary" ariaLabel="Keep destination">
+                  {current === "destinationSeed" && answers.seededDestination && (
+                    <StepShell
+                      title={`Keep ${answers.seededDestination} as your destination?`}
+                      subtitle="You can change it if needed"
+                    >
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                        <button type="button" className="btn-primary min-h-[44px] touch-manipulation" onClick={keepSeeded}>
                           Keep {answers.seededDestination}
-                        </BigButton>
-                        <BigButton onClick={changeDestination} variant="ghost" ariaLabel="Change destination">
+                        </button>
+                        <button type="button" className="btn-secondary min-h-[44px] touch-manipulation" onClick={changeDestination}>
                           Change destination
-                        </BigButton>
+                        </button>
                       </div>
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "destinationSelect" && (
-                      <ChoiceGridBig
+                  {current === "destinationSelect" && (
+                    <StepShell title="Pick a destination" subtitle="We’ll refine specifics after you submit">
+                      <ChoiceGrid
                         options={DESTINATION_CHOICES}
                         value={answers.destination}
-                        onChange={(v) => setAndAdvance("destination", v)}
+                        onChange={(v) => setAnswer("destination", v)}
                       />
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "dates" && (
-                      <div className="grid gap-5">
-                        {/* One-click presets as BOXES */}
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                          <PresetBox
-                            label="Weekend escape"
-                            hint="Sat → Sun"
-                            onClick={() => {
-                              const [s, e] = weekendEscape();
-                              setAnswers((a) => ({ ...a, startDate: s, endDate: e }));
-                              setTimeout(() => goNext(), 140);
+                  {current === "dates" && (
+                    <StepShell title="When do you plan to travel?" subtitle="Select your start and end dates">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                        <Labeled field="start-date" label="Start date">
+                          <input
+                            id="start-date"
+                            type="date"
+                            value={answers.startDate ?? ""}
+                            max={answers.endDate || undefined}
+                            onChange={(e) => {
+                              const newStartDate = e.target.value;
+                              setAnswers((a) => ({ ...a, startDate: newStartDate }));
                             }}
+                            className="input"
                           />
-                          <PresetBox
-                            label="Next 5 nights"
-                            hint="1 week from today"
-                            onClick={() => {
-                              const [s, e] = nextNights(5);
-                              setAnswers((a) => ({ ...a, startDate: s, endDate: e }));
-                              setTimeout(() => goNext(), 140);
+                        </Labeled>
+                        <Labeled field="end-date" label="End date">
+                          <input
+                            id="end-date"
+                            type="date"
+                            value={answers.endDate ?? ""}
+                            min={answers.startDate || undefined}
+                            onChange={(e) => {
+                              const newEndDate = e.target.value;
+                              setAnswers((a) => ({ ...a, endDate: newEndDate }));
                             }}
+                            className="input"
                           />
-                          <PresetBox
-                            label="Next 7 nights"
-                            hint="1 week from today"
-                            onClick={() => {
-                              const [s, e] = nextNights(7);
-                              setAnswers((a) => ({ ...a, startDate: s, endDate: e }));
-                              setTimeout(() => goNext(), 140);
-                            }}
-                          />
-                        </div>
-
-                        {/* Manual pick, still boxed */}
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                          <Labeled field="start-date" label="Start date">
-                            <input
-                              id="start-date"
-                              type="date"
-                              value={answers.startDate ?? ""}
-                              max={answers.endDate || undefined}
-                              onChange={(e) => {
-                                const newStartDate = e.target.value;
-                                setAnswers((a) => ({ ...a, startDate: newStartDate }));
-                                const endDate = answers.endDate;
-                                if (newStartDate && endDate && newStartDate <= endDate) {
-                                  setTimeout(() => goNext(), 200);
-                                }
-                              }}
-                              className="input input-lg"
-                            />
-                          </Labeled>
-                          <Labeled field="end-date" label="End date">
-                            <input
-                              id="end-date"
-                              type="date"
-                              value={answers.endDate ?? ""}
-                              min={answers.startDate || undefined}
-                              onChange={(e) => {
-                                const newEndDate = e.target.value;
-                                setAnswers((a) => ({ ...a, endDate: newEndDate }));
-                                const startDate = answers.startDate;
-                                if (startDate && newEndDate && startDate <= newEndDate) {
-                                  setTimeout(() => goNext(), 200);
-                                }
-                              }}
-                              className="input input-lg"
-                            />
-                          </Labeled>
-                        </div>
+                        </Labeled>
                       </div>
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "travellers" && (
-                      <div className="grid gap-5">
-                        {/* One-click presets as BOXES */}
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                          <PresetBox
-                            label="Solo"
-                            hint="1 adult"
-                            onClick={() => {
-                              setAnswers((a) => ({ ...a, adults: 1, children: 0 }));
-                              setTimeout(() => goNext(), 140);
+                  {current === "travellers" && (
+                    <StepShell title="How many travelers?" subtitle="At least one adult is required">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                        <Labeled field="adults" label="Adults">
+                          <NumberField
+                            id="adults"
+                            min={1}
+                            value={answers.adults ?? 1}
+                            onChange={(n) => {
+                              setAnswers((a) => ({ ...a, adults: n }));
                             }}
                           />
-                          <PresetBox
-                            label="Couple"
-                            hint="2 adults"
-                            onClick={() => {
-                              setAnswers((a) => ({ ...a, adults: 2, children: 0 }));
-                              setTimeout(() => goNext(), 140);
+                        </Labeled>
+                        <Labeled field="children" label="Children">
+                          <NumberField
+                            id="children"
+                            min={0}
+                            value={answers.children ?? 0}
+                            onChange={(n) => {
+                              setAnswers((a) => ({ ...a, children: n }));
                             }}
                           />
-                          <PresetBox
-                            label="Family"
-                            hint="2 adults, 2 kids"
-                            onClick={() => {
-                              setAnswers((a) => ({ ...a, adults: 2, children: 2 }));
-                              setTimeout(() => goNext(), 140);
-                            }}
-                          />
-                        </div>
-
-                        {/* Manual controls, still boxed */}
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                          <Labeled field="adults" label="Adults">
-                            <NumberField
-                              id="adults"
-                              min={1}
-                              value={answers.adults ?? 1}
-                              onChange={(n) => {
-                                setAnswers((a) => ({ ...a, adults: n }));
-                                if (n >= 1 && (answers.children ?? 0) >= 0) {
-                                  setTimeout(() => goNext(), 220);
-                                }
-                              }}
-                            />
-                          </Labeled>
-                          <Labeled field="children" label="Children">
-                            <NumberField
-                              id="children"
-                              min={0}
-                              value={answers.children ?? 0}
-                              onChange={(n) => {
-                                setAnswers((a) => ({ ...a, children: n }));
-                                if ((answers.adults ?? 1) >= 1 && n >= 0) {
-                                  setTimeout(() => goNext(), 220);
-                                }
-                              }}
-                            />
-                          </Labeled>
-                        </div>
+                        </Labeled>
                       </div>
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "passengerName" && (
+                  {current === "passengerName" && (
+                    <StepShell title="What's the passenger name?">
                       <Labeled field="pname" label="Full name">
                         <input
                           id="pname"
                           type="text"
-                          inputMode="text"
                           placeholder="Type your name"
+                          inputMode="text"
+                          autoComplete="name"
                           value={answers.passengerName ?? ""}
                           onChange={(e) => {
                             const newName = e.target.value;
                             setAnswers((a) => ({ ...a, passengerName: newName }));
-                            if (newName.trim().length >= 2) {
-                              setTimeout(() => goNext(), 300);
-                            }
                           }}
-                          className="input input-lg"
+                          className="input"
                         />
                       </Labeled>
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "phoneNumber" && (
-                      <div className="grid grid-cols-[120px_1fr] gap-3 sm:grid-cols-[140px_1fr]">
+                  {current === "phoneNumber" && (
+                    <StepShell title="Best phone number?">
+                      <div className="grid grid-cols-[100px_1fr] gap-2 sm:grid-cols-[140px_1fr] sm:gap-3">
                         <Labeled field="pcode" label="Country code">
                           <input
                             id="pcode"
                             type="tel"
-                            inputMode="tel"
                             placeholder="+91"
+                            inputMode="tel"
                             value={answers.phoneCountryCode ?? ""}
                             onChange={(e) => {
                               const newCode = e.target.value;
                               setAnswers((a) => ({ ...a, phoneCountryCode: newCode }));
-                              const phoneNumber = answers.phoneNumber ?? "";
-                              if (newCode.trim().length >= 1 && phoneNumber.replace(/\s+/g, "").length >= 6) {
-                                setTimeout(() => goNext(), 260);
-                              }
                             }}
-                            className="input input-lg"
+                            className="input"
                           />
                         </Labeled>
                         <Labeled field="pnum" label="Number">
                           <input
                             id="pnum"
                             type="tel"
-                            inputMode="tel"
                             placeholder="98765 43210"
+                            inputMode="tel"
+                            autoComplete="tel"
                             value={answers.phoneNumber ?? ""}
                             onChange={(e) => {
                               const newNumber = e.target.value;
                               setAnswers((a) => ({ ...a, phoneNumber: newNumber }));
-                              const countryCode = answers.phoneCountryCode ?? "";
-                              if (countryCode.trim().length >= 1 && newNumber.replace(/\s+/g, "").length >= 6) {
-                                setTimeout(() => goNext(), 260);
-                              }
                             }}
-                            className="input input-lg"
+                            className="input"
                           />
                         </Labeled>
                       </div>
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "email" && (
+                  {current === "email" && (
+                    <StepShell title="Where should we email your itinerary?">
                       <Labeled field="email" label="Email">
                         <input
                           id="email"
                           type="email"
-                          inputMode="email"
                           placeholder="you@example.com"
+                          inputMode="email"
+                          autoComplete="email"
                           value={answers.email ?? ""}
                           onChange={(e) => {
                             const newEmail = e.target.value;
                             setAnswers((a) => ({ ...a, email: newEmail }));
-                            if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
-                              setTimeout(() => goNext(), 260);
-                            }
                           }}
-                          className="input input-lg"
+                          className="input"
                         />
                       </Labeled>
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "nationality" && (
-                      <ChoiceGridBig
+                  {current === "nationality" && (
+                    <StepShell title="What's your nationality?">
+                      <ChoiceGrid
                         options={NATIONALITIES}
                         value={answers.nationality}
-                        onChange={(v) => setAndAdvance("nationality", v)}
+                        onChange={(v) => setAnswer("nationality", v)}
                       />
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "airline" && (
-                      <ChoiceGridBig
+                  {current === "airline" && (
+                    <StepShell title="Any airline preference?">
+                      <ChoiceGrid
                         options={AIRLINES}
                         value={answers.airlinePref}
-                        onChange={(v) => setAndAdvance("airlinePref", v)}
+                        onChange={(v) => setAnswer("airlinePref", v)}
                       />
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "hotel" && (
-                      <ChoiceGridBig
+                  {current === "hotel" && (
+                    <StepShell title="Hotel preference?">
+                      <ChoiceGrid
                         options={[...HOTEL_PREFERENCES, "7 Star"]}
                         value={answers.hotelPref}
-                        onChange={(v) => setAndAdvance("hotelPref", v)}
+                        onChange={(v) => setAnswer("hotelPref", v)}
                       />
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "flightClass" && (
-                      <ChoiceGridBig
+                  {current === "flightClass" && (
+                    <StepShell title="Flight class preference?">
+                      <ChoiceGrid
                         options={[...FLIGHT_CLASSES, "Premium Economy"]}
                         value={answers.flightClass}
-                        onChange={(v) => setAndAdvance("flightClass", v)}
+                        onChange={(v) => setAnswer("flightClass", v)}
                       />
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "visa" && (
-                      <ChoiceGridBig
+                  {current === "visa" && (
+                    <StepShell title="Do you have a visa?">
+                      <ChoiceGrid
                         options={VISA_STATUS}
                         value={answers.visaStatus}
-                        onChange={(v) => setAndAdvance("visaStatus", v)}
+                        onChange={(v) => setAnswer("visaStatus", v)}
                       />
-                    )}
+                    </StepShell>
+                  )}
 
-                    {current === "summary" && (
-                      <div className="rounded-xl border border-white/12 bg-white/5 p-4">
-                        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {current === "summary" && (
+                    <StepShell title="Review and submit">
+                      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                        <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
                           <Row term="From" def={answers.from} />
                           <Row term="To" def={answers.destination || answers.seededDestination} />
                           <Row term="Start" def={fmtDate(answers.startDate)} />
@@ -761,142 +669,158 @@ export default function TripBuilderLite() {
                           <Row term="Class" def={answers.flightClass} />
                           <Row term="Visa" def={answers.visaStatus} />
                         </dl>
-                        <p className="mt-3 text-sm text-zinc-400">
-                          {submitting === "saving" && "Submitting…"}
-                          {submitting === "saved" && "Redirecting…"}
-                          {submitting === "error" &&
-                            "We couldn’t submit your request. Refresh and try again."}
-                        </p>
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Sticky Bottom Dock */}
-              <div className="sticky bottom-0 z-10 mt-6">
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-zinc-950/85 px-4 py-3 backdrop-blur sm:px-6">
-                  <button
-                    type="button"
-                    onClick={goPrev}
-                    disabled={idx === 0 || submitting === "saving"}
-                    className="btn-ghost disabled:opacity-40"
-                  >
-                    ← Back
-                  </button>
-
-                  {current === "summary" ? (
-                    <button
-                      type="button"
-                      onClick={submitRequest}
-                      disabled={!hasAll || submitting === "saving"}
-                      className="btn-primary w-40 disabled:opacity-40"
-                    >
-                      {submitting === "saving" ? "Submitting…" : "Submit →"}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={goNext}
-                      disabled={!canProceed() || submitting === "saving"}
-                      className="btn-primary w-32 disabled:opacity-40"
-                    >
-                      Next →
-                    </button>
+                      <p className="mt-3 text-sm text-zinc-400">
+                        {submitting === "saving" && "Submitting…"}
+                        {submitting === "saved" && "Redirecting…"}
+                        {submitting === "error" && "We couldn’t submit your request. Refresh and try again."}
+                      </p>
+                    </StepShell>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Sticky Nav */}
+            <div className="mt-4 sm:mt-6">
+              <div className="sticky bottom-2 z-10 mx-auto flex w-full max-w-2xl items-center justify-between rounded-xl border border-white/10 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-zinc-900/40 bg-zinc-900/70 sm:px-2.5">
+                <button
+                  type="button"
+                  onClick={goPrev}
+                  disabled={idx === 0 || submitting === "saving"}
+                  className="btn-secondary disabled:opacity-40 min-h-[44px] px-3 touch-manipulation sm:px-4"
+                >
+                  ← Previous
+                </button>
+
+                <div className="text-xs text-zinc-400 px-2">Step {idx + 1} of {steps.length}</div>
+
+                {current === "summary" ? (
+                  <button
+                    type="button"
+                    onClick={submitRequest}
+                    disabled={!hasAll || submitting === "saving"}
+                    className="btn-primary disabled:opacity-40 min-h-[44px] px-3 touch-manipulation sm:px-4"
+                  >
+                    {submitting === "saving" ? "Submitting…" : "Submit →"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    disabled={!canProceed() || submitting === "saving"}
+                    className="btn-primary disabled:opacity-40 min-h-[44px] px-3 touch-manipulation sm:px-4"
+                  >
+                    Next →
+                  </button>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* CSS helpers for boxed UI, bigger tiles, and one-click affordance */}
+      {/* CSS helpers for your dark glass aesthetic */}
       <style jsx>{`
-        .card {
-          border: 1px solid rgba(255, 255, 255, 0.10);
-          background: rgba(255, 255, 255, 0.04);
-          border-radius: 1rem;
-          padding: 1rem;
-          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-        }
-
         .input {
           width: 100%;
           border-radius: 0.9rem;
           border: 1px solid rgba(255, 255, 255, 0.12);
           background: rgba(255, 255, 255, 0.06);
           color: white;
-          padding: 0.65rem 0.9rem;
+          padding: 0.7rem 0.9rem;
           outline: none;
           backdrop-filter: blur(6px);
-          transition: border-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
+          -webkit-appearance: none;
+          appearance: none;
         }
         .input:focus {
-          border-color: rgba(255, 255, 255, 0.28);
+          border-color: rgba(255, 255, 255, 0.24);
           box-shadow: 0 0 0 4px rgba(180, 180, 255, 0.12);
         }
-        .input-lg {
-          padding: 0.9rem 1rem;
-          font-size: 1rem;
-        }
-
-        .btn-primary, .btn-ghost {
+        .btn-primary {
           border-radius: 0.9rem;
           border: 1px solid rgba(255, 255, 255, 0.14);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06));
           color: white;
-          padding: 0.7rem 1rem;
+          padding: 0.55rem 0.95rem;
           backdrop-filter: blur(6px);
-          transition: transform 80ms ease, background 160ms ease, border-color 160ms ease;
-          touch-action: manipulation;
         }
-        .btn-primary {
-          background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06));
-        }
-        .btn-ghost {
-          background: rgba(255, 255, 255, 0.06);
-        }
-        .btn-primary:active, .btn-ghost:active {
-          transform: scale(0.98);
-        }
-
-        .choice {
-          border-radius: 1rem;
-          border: 1px solid rgba(255, 255, 255, 0.12);
+        .btn-secondary {
+          border-radius: 0.9rem;
+          border: 1px solid rgba(255, 255, 255, 0.14);
           background: rgba(255, 255, 255, 0.06);
           color: white;
-          padding: 1rem 1rem;
-          line-height: 1.2;
-          text-align: left;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 0.75rem;
-          transition: transform 80ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-          touch-action: manipulation;
+          padding: 0.55rem 0.95rem;
+          backdrop-filter: blur(6px);
         }
-        .choice:hover { background: rgba(255, 255, 255, 0.10); }
-        .choice:active { transform: scale(0.98); }
-        .choice[data-active="true"] {
-          border-color: rgba(255, 255, 255, 0.28);
-          background: rgba(255, 255, 255, 0.12);
-          box-shadow: 0 4px 24px rgba(140, 140, 255, 0.12) inset;
+        .hide-scrollbar {
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* IE/Edge */
         }
-
-        .pill {
-          display: inline-flex;
-          height: 0.9rem;
-          width: 0.9rem;
-          border-radius: 9999px;
-          background: rgba(255, 255, 255, 0.35);
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none; /* WebKit */
         }
-        .pill[data-active="true"] { background: white; }
       `}</style>
     </section>
   );
 }
 
 /* ---------------- Little building blocks ---------------- */
+function StepShell(props: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h3 className="text-lg font-semibold text-white sm:text-xl md:text-2xl">{props.title}</h3>
+        {props.subtitle && <p className="mt-1 text-sm text-zinc-400">{props.subtitle}</p>}
+      </div>
+      <div className="mt-0.5">{props.children}</div>
+    </div>
+  );
+}
+
+function ChoiceGrid({
+  options,
+  value,
+  onChange,
+}: {
+  options: ReadonlyArray<string>;
+  value?: string;
+  onChange: (val: string) => void;
+}) {
+  return (
+    <div role="radiogroup" className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-2.5">
+      {options.map((opt) => {
+        const active = value === opt;
+        return (
+          <button
+            key={opt}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(opt)}
+            className={[
+              "group rounded-xl border px-3 py-3 text-left transition touch-manipulation min-h-[48px]",
+              "active:scale-[0.99]",
+              active ? "border-white/30 bg-white/10" : "border-white/10 bg-white/5 hover:bg-white/10",
+            ].join(" ")}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[15px] leading-5 text-white">{opt}</span>
+              <span
+                className={[
+                  "ml-3 inline-flex h-3 w-3 rounded-full",
+                  active ? "bg-white" : "bg-white/30 group-hover:bg-white/50",
+                ].join(" ")}
+              />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function Labeled({
   field,
   label,
@@ -907,89 +831,10 @@ function Labeled({
   children: React.ReactNode;
 }) {
   return (
-    <label htmlFor={field} className="block rounded-xl border border-white/10 bg-white/5 p-3">
-      <div className="mb-2 text-xs uppercase tracking-wide text-zinc-400">{label}</div>
+    <label htmlFor={field} className="block">
+      <div className="mb-1 text-xs uppercase tracking-wide text-zinc-400">{label}</div>
       {children}
     </label>
-  );
-}
-
-function BigButton({
-  children,
-  onClick,
-  variant = "primary",
-  ariaLabel,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  variant?: "primary" | "ghost";
-  ariaLabel?: string;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      onClick={onClick}
-      className={variant === "primary" ? "btn-primary w-full" : "btn-ghost w-full"}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ChoiceGridBig({
-  options,
-  value,
-  onChange,
-}: {
-  options: ReadonlyArray<string>;
-  value?: string;
-  onChange: (val: string) => void;
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-      {options.map((opt) => {
-        const active = value === opt;
-        return (
-          <button
-            key={opt}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onChange(opt)}
-            className="choice"
-            data-active={active ? "true" : "false"}
-          >
-            <span className="text-base">{opt}</span>
-            <span className="pill" data-active={active ? "true" : "false"} />
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function PresetBox({
-  label,
-  hint,
-  onClick,
-}: {
-  label: string;
-  hint?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="choice"
-      aria-label={label}
-    >
-      <div>
-        <div className="text-base text-white">{label}</div>
-        {hint && <div className="text-xs text-zinc-400 mt-0.5">{hint}</div>}
-      </div>
-      <span className="pill" data-active="true" />
-    </button>
   );
 }
 
@@ -1005,12 +850,11 @@ function NumberField({
   onChange: (n: number) => void;
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5 sm:gap-2">
       <button
         type="button"
-        className="btn-ghost px-3 py-2"
+        className="btn-secondary px-2.5 py-2 min-w-[40px] min-h-[40px] touch-manipulation sm:px-3"
         onClick={() => onChange(Math.max(min, (value || 0) - 1))}
-        aria-label="Decrease"
       >
         −
       </button>
@@ -1019,14 +863,15 @@ function NumberField({
         type="number"
         min={min}
         value={value}
+        inputMode="numeric"
         onChange={(e) => onChange(Number(e.target.value || 0))}
-        className="input input-lg text-center"
+        className="input text-center min-h-[40px]"
+        style={{ MozAppearance: "textfield" as any }}
       />
       <button
         type="button"
-        className="btn-ghost px-3 py-2"
+        className="btn-secondary px-2.5 py-2 min-w-[40px] min-h-[40px] touch-manipulation sm:px-3"
         onClick={() => onChange((value || 0) + 1)}
-        aria-label="Increase"
       >
         +
       </button>
@@ -1036,22 +881,42 @@ function NumberField({
 
 function Row({ term, def }: { term: string; def?: string | null }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+    <div className="rounded-lg bg-white/5 p-3">
       <dt className="text-xs uppercase tracking-wide text-zinc-400">{term}</dt>
       <dd className="mt-1 text-sm text-white">{def || "—"}</dd>
     </div>
   );
 }
 
-function ProgressBar({ total, index }: { total: number; index: number }) {
-  const pct = Math.max(2, Math.min(100, Math.round(((index + 1) / total) * 100)));
+function ProgressPips({
+  total,
+  index,
+  onJump,
+  maxVisited,
+}: {
+  total: number;
+  index: number;
+  onJump: (i: number) => void;
+  maxVisited: number;
+}) {
   return (
-    <div className="h-1.5 w-full bg-white/10">
-      <div
-        className="h-full bg-white transition-[width] duration-300 ease-out"
-        style={{ width: `${pct}%` }}
-        aria-hidden
-      />
+    <div className="flex items-center justify-center gap-2">
+      {Array.from({ length: total }).map((_, i) => {
+        const visited = i <= maxVisited;
+        return (
+          <button
+            key={i}
+            type="button"
+            aria-label={`Go to step ${i + 1}`}
+            onClick={() => visited && onJump(i)}
+            className={[
+              "h-1.5 w-6 rounded-full transition",
+              i <= index ? "bg-white" : "bg-white/20",
+              visited ? "opacity-100" : "opacity-40 cursor-not-allowed",
+            ].join(" ")}
+          />
+        );
+      })}
     </div>
   );
 }
