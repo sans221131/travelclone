@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+/* Smooth anchor scroll */
+html { scroll-behavior: smooth; }
+
+/* Token sanity */
+:root { color-scheme: dark; }
+html, body { height: 100%; }
+body { background: #000; }
+
+/* Hide scrollbars where applied */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE/Edge legacy */
+  scrollbar-width: none;     /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;             /* Chrome/Safari/Edge */
+}
+
+/* Custom radiating glow effect */
+.bg-gradient-radial {
+  background: radial-gradient(circle, var(--tw-gradient-stops));
+}
