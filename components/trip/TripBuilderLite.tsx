@@ -89,12 +89,15 @@ function fmtDate(iso?: string) {
 }
 
 // map labels like "Dubai, UAE" or "Dubai" back to canonical label
-const DESTINATION_LABEL_TO_ID = DESTINATIONS.reduce<Record<string, string>>((acc, dest) => {
-  acc[dest.toLowerCase()] = dest;
-  const city = dest.split(",")[0].toLowerCase();
-  acc[city] = dest;
-  return acc;
-}, {});
+const DESTINATION_LABEL_TO_ID = DESTINATIONS.reduce<Record<string, string>>(
+  (acc, dest) => {
+    acc[dest.toLowerCase()] = dest;
+    const city = dest.split(",")[0].toLowerCase();
+    acc[city] = dest;
+    return acc;
+  },
+  {}
+);
 
 function destinationSlugFromLabel(label?: string) {
   if (!label) return undefined;
@@ -133,7 +136,9 @@ export default function TripBuilderLite() {
   const current = steps[idx];
 
   // submission state
-  const [submitting, setSubmitting] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [submitting, setSubmitting] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
 
   const hasAll = useMemo(() => {
     return Boolean(
@@ -188,7 +193,11 @@ export default function TripBuilderLite() {
       case "destinationSelect":
         return !!answers.destination;
       case "dates":
-        return Boolean(answers.startDate && answers.endDate && answers.startDate <= answers.endDate);
+        return Boolean(
+          answers.startDate &&
+            answers.endDate &&
+            answers.startDate <= answers.endDate
+        );
       case "travellers":
         return (answers.adults ?? 0) >= 1 && (answers.children ?? 0) >= 0;
       case "passengerName":
@@ -222,7 +231,9 @@ export default function TripBuilderLite() {
 
     // special routing to mirror receipt flow nuances
     if (current === "fromLocation") {
-      const next = answers.seededDestination ? "destinationSeed" : "destinationSelect";
+      const next = answers.seededDestination
+        ? "destinationSeed"
+        : "destinationSelect";
       const to = steps.indexOf(next);
       setIdx(to);
       setMaxVisited((v) => Math.max(v, to));
@@ -283,7 +294,11 @@ export default function TripBuilderLite() {
     }
   }
   function changeDestination() {
-    setAnswers((a) => ({ ...a, seededDestination: undefined, seedPromptShown: true }));
+    setAnswers((a) => ({
+      ...a,
+      seededDestination: undefined,
+      seedPromptShown: true,
+    }));
     const to = steps.indexOf("destinationSelect");
     if (to >= 0) {
       setTimeout(() => {
@@ -326,7 +341,9 @@ export default function TripBuilderLite() {
 
       const json = await res.json().catch(() => null);
       const createdId =
-        json && typeof json === "object" ? (json as { id?: string }).id ?? null : null;
+        json && typeof json === "object"
+          ? (json as { id?: string }).id ?? null
+          : null;
 
       setSubmitting("saved");
 
@@ -335,7 +352,9 @@ export default function TripBuilderLite() {
       if (destId) params.set("destinationId", destId);
 
       if (createdId) {
-        router.push(`/trip/receipt/${createdId}${params.size ? `?${params}` : ""}`);
+        router.push(
+          `/trip/receipt/${createdId}${params.size ? `?${params}` : ""}`
+        );
       } else {
         router.push(`/trip/receipt${params.size ? `?${params}` : ""}`);
       }
@@ -385,7 +404,7 @@ export default function TripBuilderLite() {
       <div className="mx-auto grid max-w-4xl place-items-center px-3 pt-12 pb-[108px] sm:px-4 sm:pt-16 md:pt-18">
         <h2
           id="tripbuilder-heading"
-          className="mb-4 text-center text-xl font-semibold tracking-tight text-white sm:mb-6 sm:text-2xl md:text-3xl"
+          className="mb-4 text-center text-6xl font-semibold tracking-tight text-white sm:mb-6"
         >
           Trip Builder Lite
         </h2>
@@ -426,7 +445,10 @@ export default function TripBuilderLite() {
               >
                 <div className="grid w-full gap-6">
                   {current === "fromLocation" && (
-                    <StepShell title="Where are you traveling from?" subtitle="Major cities with airports">
+                    <StepShell
+                      title="Where are you traveling from?"
+                      subtitle="Major cities with airports"
+                    >
                       <ChoiceGrid
                         options={ORIGIN_CITIES}
                         value={answers.from}
@@ -435,24 +457,36 @@ export default function TripBuilderLite() {
                     </StepShell>
                   )}
 
-                  {current === "destinationSeed" && answers.seededDestination && (
-                    <StepShell
-                      title={`Keep ${answers.seededDestination} as your destination?`}
-                      subtitle="You can change it if needed"
-                    >
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                        <button type="button" className="btn-primary min-h-[44px] touch-manipulation" onClick={keepSeeded}>
-                          Keep {answers.seededDestination}
-                        </button>
-                        <button type="button" className="btn-secondary min-h-[44px] touch-manipulation" onClick={changeDestination}>
-                          Change destination
-                        </button>
-                      </div>
-                    </StepShell>
-                  )}
+                  {current === "destinationSeed" &&
+                    answers.seededDestination && (
+                      <StepShell
+                        title={`Keep ${answers.seededDestination} as your destination?`}
+                        subtitle="You can change it if needed"
+                      >
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                          <button
+                            type="button"
+                            className="btn-primary min-h-[44px] touch-manipulation"
+                            onClick={keepSeeded}
+                          >
+                            Keep {answers.seededDestination}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary min-h-[44px] touch-manipulation"
+                            onClick={changeDestination}
+                          >
+                            Change destination
+                          </button>
+                        </div>
+                      </StepShell>
+                    )}
 
                   {current === "destinationSelect" && (
-                    <StepShell title="Pick a destination" subtitle="We’ll refine specifics after you submit">
+                    <StepShell
+                      title="Pick a destination"
+                      subtitle="We’ll refine specifics after you submit"
+                    >
                       <ChoiceGrid
                         options={DESTINATION_CHOICES}
                         value={answers.destination}
@@ -462,7 +496,10 @@ export default function TripBuilderLite() {
                   )}
 
                   {current === "dates" && (
-                    <StepShell title="When do you plan to travel?" subtitle="Select your start and end dates">
+                    <StepShell
+                      title="When do you plan to travel?"
+                      subtitle="Select your start and end dates"
+                    >
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                         <Labeled field="start-date" label="Start date">
                           <input
@@ -472,7 +509,10 @@ export default function TripBuilderLite() {
                             max={answers.endDate || undefined}
                             onChange={(e) => {
                               const newStartDate = e.target.value;
-                              setAnswers((a) => ({ ...a, startDate: newStartDate }));
+                              setAnswers((a) => ({
+                                ...a,
+                                startDate: newStartDate,
+                              }));
                             }}
                             className="input"
                           />
@@ -485,7 +525,10 @@ export default function TripBuilderLite() {
                             min={answers.startDate || undefined}
                             onChange={(e) => {
                               const newEndDate = e.target.value;
-                              setAnswers((a) => ({ ...a, endDate: newEndDate }));
+                              setAnswers((a) => ({
+                                ...a,
+                                endDate: newEndDate,
+                              }));
                             }}
                             className="input"
                           />
@@ -495,7 +538,10 @@ export default function TripBuilderLite() {
                   )}
 
                   {current === "travellers" && (
-                    <StepShell title="How many travelers?" subtitle="At least one adult is required">
+                    <StepShell
+                      title="How many travelers?"
+                      subtitle="At least one adult is required"
+                    >
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                         <Labeled field="adults" label="Adults">
                           <NumberField
@@ -533,7 +579,10 @@ export default function TripBuilderLite() {
                           value={answers.passengerName ?? ""}
                           onChange={(e) => {
                             const newName = e.target.value;
-                            setAnswers((a) => ({ ...a, passengerName: newName }));
+                            setAnswers((a) => ({
+                              ...a,
+                              passengerName: newName,
+                            }));
                           }}
                           className="input"
                         />
@@ -553,7 +602,10 @@ export default function TripBuilderLite() {
                             value={answers.phoneCountryCode ?? ""}
                             onChange={(e) => {
                               const newCode = e.target.value;
-                              setAnswers((a) => ({ ...a, phoneCountryCode: newCode }));
+                              setAnswers((a) => ({
+                                ...a,
+                                phoneCountryCode: newCode,
+                              }));
                             }}
                             className="input"
                           />
@@ -568,7 +620,10 @@ export default function TripBuilderLite() {
                             value={answers.phoneNumber ?? ""}
                             onChange={(e) => {
                               const newNumber = e.target.value;
-                              setAnswers((a) => ({ ...a, phoneNumber: newNumber }));
+                              setAnswers((a) => ({
+                                ...a,
+                                phoneNumber: newNumber,
+                              }));
                             }}
                             className="input"
                           />
@@ -652,15 +707,28 @@ export default function TripBuilderLite() {
                       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                         <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
                           <Row term="From" def={answers.from} />
-                          <Row term="To" def={answers.destination || answers.seededDestination} />
+                          <Row
+                            term="To"
+                            def={
+                              answers.destination || answers.seededDestination
+                            }
+                          />
                           <Row term="Start" def={fmtDate(answers.startDate)} />
                           <Row term="End" def={fmtDate(answers.endDate)} />
-                          <Row term="Adults" def={String(answers.adults ?? 0)} />
-                          <Row term="Children" def={String(answers.children ?? 0)} />
+                          <Row
+                            term="Adults"
+                            def={String(answers.adults ?? 0)}
+                          />
+                          <Row
+                            term="Children"
+                            def={String(answers.children ?? 0)}
+                          />
                           <Row term="Name" def={answers.passengerName} />
                           <Row
                             term="Phone"
-                            def={`${answers.phoneCountryCode ?? ""} ${answers.phoneNumber ?? ""}`.trim()}
+                            def={`${answers.phoneCountryCode ?? ""} ${
+                              answers.phoneNumber ?? ""
+                            }`.trim()}
                           />
                           <Row term="Email" def={answers.email} />
                           <Row term="Nationality" def={answers.nationality} />
@@ -673,7 +741,8 @@ export default function TripBuilderLite() {
                       <p className="mt-3 text-sm text-zinc-400">
                         {submitting === "saving" && "Submitting…"}
                         {submitting === "saved" && "Redirecting…"}
-                        {submitting === "error" && "We couldn’t submit your request. Refresh and try again."}
+                        {submitting === "error" &&
+                          "We couldn’t submit your request. Refresh and try again."}
                       </p>
                     </StepShell>
                   )}
@@ -693,7 +762,9 @@ export default function TripBuilderLite() {
                   ← Previous
                 </button>
 
-                <div className="text-xs text-zinc-400 px-2">Step {idx + 1} of {steps.length}</div>
+                <div className="text-xs text-zinc-400 px-2">
+                  Step {idx + 1} of {steps.length}
+                </div>
 
                 {current === "summary" ? (
                   <button
@@ -741,7 +812,11 @@ export default function TripBuilderLite() {
         .btn-primary {
           border-radius: 0.9rem;
           border: 1px solid rgba(255, 255, 255, 0.14);
-          background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06));
+          background: linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.18),
+            rgba(255, 255, 255, 0.06)
+          );
           color: white;
           padding: 0.55rem 0.95rem;
           backdrop-filter: blur(6px);
@@ -767,12 +842,20 @@ export default function TripBuilderLite() {
 }
 
 /* ---------------- Little building blocks ---------------- */
-function StepShell(props: { title: string; subtitle?: string; children: React.ReactNode }) {
+function StepShell(props: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h3 className="text-lg font-semibold text-white sm:text-xl md:text-2xl">{props.title}</h3>
-        {props.subtitle && <p className="mt-1 text-sm text-zinc-400">{props.subtitle}</p>}
+        <h3 className="text-lg font-semibold text-white sm:text-xl md:text-2xl">
+          {props.title}
+        </h3>
+        {props.subtitle && (
+          <p className="mt-1 text-sm text-zinc-400">{props.subtitle}</p>
+        )}
       </div>
       <div className="mt-0.5">{props.children}</div>
     </div>
@@ -789,7 +872,10 @@ function ChoiceGrid({
   onChange: (val: string) => void;
 }) {
   return (
-    <div role="radiogroup" className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-2.5">
+    <div
+      role="radiogroup"
+      className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-2.5"
+    >
       {options.map((opt) => {
         const active = value === opt;
         return (
@@ -802,7 +888,9 @@ function ChoiceGrid({
             className={[
               "group rounded-xl border px-3 py-3 text-left transition touch-manipulation min-h-[48px]",
               "active:scale-[0.99]",
-              active ? "border-white/30 bg-white/10" : "border-white/10 bg-white/5 hover:bg-white/10",
+              active
+                ? "border-white/30 bg-white/10"
+                : "border-white/10 bg-white/5 hover:bg-white/10",
             ].join(" ")}
           >
             <div className="flex items-center justify-between">
@@ -832,7 +920,9 @@ function Labeled({
 }) {
   return (
     <label htmlFor={field} className="block">
-      <div className="mb-1 text-xs uppercase tracking-wide text-zinc-400">{label}</div>
+      <div className="mb-1 text-xs uppercase tracking-wide text-zinc-400">
+        {label}
+      </div>
       {children}
     </label>
   );

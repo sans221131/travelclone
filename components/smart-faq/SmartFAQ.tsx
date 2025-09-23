@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 /* --------------------------------------------------------------------------
@@ -28,7 +34,12 @@ const FAQS: FAQItem[] = [
     answer:
       "You submit your trip details; our team calls to refine the plan; we send a formal quotation with an invoice reference.",
     tags: ["booking", "quotes"],
-    synonyms: ["how do i book", "pricing process", "get a quote", "quotation process"],
+    synonyms: [
+      "how do i book",
+      "pricing process",
+      "get a quote",
+      "quotation process",
+    ],
   },
   {
     id: "what-is-trip-builder-lite",
@@ -61,7 +72,8 @@ const tokenize = (s: string) =>
 function editDistance(a: string, b: string) {
   a = norm(a);
   b = norm(b);
-  const m = a.length, n = b.length;
+  const m = a.length,
+    n = b.length;
   if (!m) return n;
   if (!n) return m;
   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
@@ -70,7 +82,11 @@ function editDistance(a: string, b: string) {
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
     }
   }
   return dp[m][n];
@@ -93,11 +109,15 @@ function scoreItem(q: string, item: FAQItem) {
     if (qt.length < 2) continue;
     if (title.split(/\s+/).includes(qt)) score += 10;
     if (title.includes(qt)) score += 6;
-    if (tags.some(t => t.includes(qt))) score += 7;
-    if (syns.some(s => s.includes(qt))) score += 6;
+    if (tags.some((t) => t.includes(qt))) score += 7;
+    if (syns.some((s) => s.includes(qt))) score += 6;
     if (ans.includes(qt)) score += 3;
 
-    const cands = [...title.split(/\s+/), ...syns.flatMap(s => s.split(/\s+/)), ...tags];
+    const cands = [
+      ...title.split(/\s+/),
+      ...syns.flatMap((s) => s.split(/\s+/)),
+      ...tags,
+    ];
     let best = Infinity;
     for (const c of cands) best = Math.min(best, editDistance(qt, c));
     if (best <= 1 && qt.length >= 4) score += 5;
@@ -118,7 +138,7 @@ export default function SmartFAQ() {
 
   const allTags = useMemo(() => {
     const s = new Set<string>();
-    FAQS.forEach(f => f.tags.forEach(t => s.add(t)));
+    FAQS.forEach((f) => f.tags.forEach((t) => s.add(t)));
     return Array.from(s).sort();
   }, []);
 
@@ -144,7 +164,7 @@ export default function SmartFAQ() {
     const hash = window.location.hash.replace(/^#\/?/, "");
     if (hash.startsWith("faq/")) {
       const id = hash.slice(4);
-      if (id) setExpanded(prev => new Set(prev).add(id));
+      if (id) setExpanded((prev) => new Set(prev).add(id));
     }
   }, []);
 
@@ -171,11 +191,13 @@ export default function SmartFAQ() {
 
   // Mutators — no router calls here
   const toggleTag = useCallback((t: string) => {
-    setSelectedTags(prev => (prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]));
+    setSelectedTags((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
+    );
   }, []);
 
   const removeTag = useCallback((t: string) => {
-    setSelectedTags(prev => prev.filter(x => x !== t));
+    setSelectedTags((prev) => prev.filter((x) => x !== t));
   }, []);
 
   const clearAll = useCallback(() => {
@@ -191,7 +213,7 @@ export default function SmartFAQ() {
   }, []);
 
   const toggleExpand = useCallback((id: string) => {
-    setExpanded(prev => {
+    setExpanded((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       lastToggledId.current = id;
@@ -202,24 +224,34 @@ export default function SmartFAQ() {
   /* Search + ranking */
   const ranked = useMemo(() => {
     const byTags = selectedTags.length
-      ? FAQS.filter(f => selectedTags.every(t => f.tags.includes(t)))
+      ? FAQS.filter((f) => selectedTags.every((t) => f.tags.includes(t)))
       : FAQS;
 
-    const withScores = byTags.map(f => ({ item: f, score: scoreItem(query, f) }));
-    withScores.sort((a, b) => b.score - a.score || a.item.question.localeCompare(b.item.question));
+    const withScores = byTags.map((f) => ({
+      item: f,
+      score: scoreItem(query, f),
+    }));
+    withScores.sort(
+      (a, b) =>
+        b.score - a.score || a.item.question.localeCompare(b.item.question)
+    );
 
     const best = withScores[0];
     const second = withScores[1];
     const bestAnswerId =
       best &&
-      ((second ? best.score - second.score > 10 : best.score > 18) || norm(best.item.question) === norm(query))
+      ((second ? best.score - second.score > 10 : best.score > 18) ||
+        norm(best.item.question) === norm(query))
         ? best.item.id
         : null;
 
-    return { bestAnswerId, results: withScores.map(x => x.item) };
+    return { bestAnswerId, results: withScores.map((x) => x.item) };
   }, [query, selectedTags]);
 
-  const visibleIds = useMemo(() => ranked.results.map(r => r.id), [ranked.results]);
+  const visibleIds = useMemo(
+    () => ranked.results.map((r) => r.id),
+    [ranked.results]
+  );
 
   /* Keyboard nav */
   useEffect(() => {
@@ -242,12 +274,17 @@ export default function SmartFAQ() {
       }
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
-        setActiveIndex(prev => {
+        setActiveIndex((prev) => {
           const max = ranked.results.length - 1;
           if (max < 0) return -1;
-          const next = e.key === "ArrowDown" ? Math.min(max, prev + 1) : Math.max(0, prev - 1);
+          const next =
+            e.key === "ArrowDown"
+              ? Math.min(max, prev + 1)
+              : Math.max(0, prev - 1);
           const id = ranked.results[next]?.id;
-          document.getElementById(`faq-item-${id}`)?.scrollIntoView({ block: "nearest" });
+          document
+            .getElementById(`faq-item-${id}`)
+            ?.scrollIntoView({ block: "nearest" });
           return next;
         });
         return;
@@ -264,32 +301,41 @@ export default function SmartFAQ() {
 
   /* JSON-LD */
   const jsonLd = useMemo(() => {
-    const mainEntity = ranked.results.slice(0, 6).map(f => ({
+    const mainEntity = ranked.results.slice(0, 6).map((f) => ({
       "@type": "Question",
       name: f.question,
       acceptedAnswer: { "@type": "Answer", text: f.answer },
     }));
-    return { "@context": "https://schema.org", "@type": "FAQPage", mainEntity } as const;
+    return {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity,
+    } as const;
   }, [ranked.results]);
 
   return (
     <section className="relative w-full bg-transparent text-white/90">
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-14 sm:py-18">
         <header className="mb-8 sm:mb-10">
-          <p className="text-xs tracking-[0.25em] text-white/50 uppercase">Answers, on tap</p>
-          <h2 className="mt-2 text-4xl sm:text-5xl font-semibold tracking-tight text-white">Smart FAQ</h2>
-          <p className="mt-3 text-sm sm:text-base text-white/70">
-            Search, filter, deep link. Press <kbd className="px-1 py-0.5 rounded bg-white/10 text-white/80">/</kbd> to focus search.
+          <p className="text-xs tracking-[0.25em] text-white/50 uppercase">
+            Answers, on tap
+          </p>
+          <h2 className="mt-2 text-6xl font-semibold tracking-tight text-white">
+            Smart FAQ
+          </h2>
+          <p className="mt-3 text-base sm:text-xl lg:text-2xl text-white/70">
+            Search, filter, deep link. Press{" "}
+            <kbd className="px-1 py-0.5 rounded bg-white/10 text-white/80">
+              /
+            </kbd>{" "}
+            to focus search.
           </p>
         </header>
 
         {/* Two-pane layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* Dock (left) */}
-          <aside
-            className="lg:col-span-4"
-            aria-label="FAQ filters and tools"
-          >
+          <aside className="lg:col-span-4" aria-label="FAQ filters and tools">
             <div className="dockPanel sticky top-[calc(var(--header-h,72px)+16px)]">
               <div className="panel accentEdge rounded-2xl overflow-hidden">
                 {/* Search */}
@@ -298,16 +344,21 @@ export default function SmartFAQ() {
                     Search questions
                   </label>
                   <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
-                    <div className="i-lucide-search h-4 w-4 opacity-60" aria-hidden />
+                    <div
+                      className="i-lucide-search h-4 w-4 opacity-60"
+                      aria-hidden
+                    />
                     <input
                       id="faq-search"
                       ref={searchRef}
                       value={query}
-                      onChange={e => setQuery(e.target.value)}
+                      onChange={(e) => setQuery(e.target.value)}
                       placeholder="Search questions..."
                       className="w-full bg-transparent outline-none placeholder-white/40 text-sm sm:text-base"
                     />
-                    <kbd className="hidden sm:block text-[11px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">/</kbd>
+                    <kbd className="hidden sm:block text-[11px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">
+                      /
+                    </kbd>
                   </div>
 
                   {/* Active filters */}
@@ -327,7 +378,7 @@ export default function SmartFAQ() {
                           </button>
                         </span>
                       )}
-                      {selectedTags.map(t => (
+                      {selectedTags.map((t) => (
                         <span
                           key={`sel-${t}`}
                           className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/10 px-3 py-1.5 text-xs"
@@ -356,9 +407,11 @@ export default function SmartFAQ() {
 
                 {/* Tags */}
                 <div className="p-3 sm:p-4">
-                  <div className="mb-2 text-[11px] uppercase tracking-[0.16em] text-white/50">Filter by tags</div>
+                  <div className="mb-2 text-[11px] uppercase tracking-[0.16em] text-white/50">
+                    Filter by tags
+                  </div>
                   <div className="flex flex-wrap gap-2">
-                    {allTags.map(t => {
+                    {allTags.map((t) => {
                       const on = selectedTags.includes(t);
                       return (
                         <button
@@ -367,7 +420,9 @@ export default function SmartFAQ() {
                           onClick={() => toggleTag(t)}
                           className={clsx(
                             "shrink-0 text-xs sm:text-sm rounded-full px-3 py-1.5 border transition",
-                            on ? "bg-white text-black border-white" : "bg-white/5 text-white/80 border-white/10 hover:bg-white/10"
+                            on
+                              ? "bg-white text-black border-white"
+                              : "bg-white/5 text-white/80 border-white/10 hover:bg-white/10"
                           )}
                           aria-pressed={on}
                         >
@@ -399,7 +454,8 @@ export default function SmartFAQ() {
 
               {/* Count card */}
               <div className="mt-4 panel rounded-xl px-4 py-3 text-sm text-white/70">
-                <span className="text-white">{ranked.results.length}</span> result
+                <span className="text-white">{ranked.results.length}</span>{" "}
+                result
                 {ranked.results.length === 1 ? "" : "s"} found
               </div>
             </div>
@@ -410,7 +466,7 @@ export default function SmartFAQ() {
             {/* Best Answer hero */}
             {ranked.bestAnswerId && (
               <BestAnswerHero
-                item={FAQS.find(f => f.id === ranked.bestAnswerId)!}
+                item={FAQS.find((f) => f.id === ranked.bestAnswerId)!}
                 onToggle={() => toggleExpand(ranked.bestAnswerId!)}
                 expanded={expanded.has(ranked.bestAnswerId)}
               />
@@ -429,9 +485,7 @@ export default function SmartFAQ() {
                 />
               ))}
 
-              {ranked.results.length === 0 && (
-                <EmptyState onReset={clearAll} />
-              )}
+              {ranked.results.length === 0 && <EmptyState onReset={clearAll} />}
             </div>
           </main>
         </div>
@@ -446,17 +500,22 @@ export default function SmartFAQ() {
 
       {/* Panels + accent edge + subtle grid texture */}
       <style jsx>{`
-        .dockPanel { /* wrapper so sticky looks good on tall pages */ }
+        .dockPanel {
+          /* wrapper so sticky looks good on tall pages */
+        }
 
         .panel {
           position: relative;
-          border: 1px solid rgba(255, 255, 255, 0.10);
-          background:
-            linear-gradient(to bottom right, rgba(255,255,255,0.06), rgba(255,255,255,0.03)) border-box;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: linear-gradient(
+              to bottom right,
+              rgba(255, 255, 255, 0.06),
+              rgba(255, 255, 255, 0.03)
+            )
+            border-box;
           backdrop-filter: blur(14px);
-          box-shadow:
-            inset 0 1px 0 rgba(255,255,255,0.06),
-            0 8px 30px rgba(0,0,0,0.35);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+            0 8px 30px rgba(0, 0, 0, 0.35);
         }
         /* subtle grid texture */
         .panel::after {
@@ -464,9 +523,16 @@ export default function SmartFAQ() {
           position: absolute;
           inset: 0;
           border-radius: inherit;
-          background-image:
-            linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+          background-image: linear-gradient(
+              to right,
+              rgba(255, 255, 255, 0.03) 1px,
+              transparent 1px
+            ),
+            linear-gradient(
+              to bottom,
+              rgba(255, 255, 255, 0.03) 1px,
+              transparent 1px
+            );
           background-size: 24px 24px;
           pointer-events: none;
           mask: linear-gradient(#000, #000);
@@ -481,17 +547,32 @@ export default function SmartFAQ() {
           inset: 0 0 0 auto;
           width: 4px;
           border-radius: 999px;
-          background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12));
+          background: linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.7),
+            rgba(255, 255, 255, 0.12)
+          );
           opacity: 0.6;
         }
         @media (prefers-color-scheme: light) {
-          .panel { border-color: rgba(0,0,0,0.10); }
-          .panel::after {
-            background-image:
-              linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
-              linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px);
+          .panel {
+            border-color: rgba(0, 0, 0, 0.1);
           }
-          .accentEdge::before { opacity: 0.5; }
+          .panel::after {
+            background-image: linear-gradient(
+                to right,
+                rgba(0, 0, 0, 0.04) 1px,
+                transparent 1px
+              ),
+              linear-gradient(
+                to bottom,
+                rgba(0, 0, 0, 0.04) 1px,
+                transparent 1px
+              );
+          }
+          .accentEdge::before {
+            opacity: 0.5;
+          }
         }
       `}</style>
     </section>
@@ -515,11 +596,15 @@ function BestAnswerHero({
         {/* ribbon */}
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-300/15 px-3 py-1">
           <span className="h-1.5 w-1.5 rounded-full bg-amber-300/80" />
-          <span className="text-xs tracking-wide text-amber-100/90 uppercase">Best answer</span>
+          <span className="text-xs tracking-wide text-amber-100/90 uppercase">
+            Best answer
+          </span>
         </div>
 
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-lg sm:text-xl font-semibold text-white">{item.question}</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-white">
+            {item.question}
+          </h3>
           <button
             type="button"
             className="text-xs rounded-md px-2.5 py-1.5 bg-amber-200/20 hover:bg-amber-200/30 border border-amber-200/30"
@@ -533,11 +618,15 @@ function BestAnswerHero({
         <div
           className={clsx(
             "grid transition-[grid-template-rows,opacity] duration-150 ease-out",
-            expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-80"
+            expanded
+              ? "grid-rows-[1fr] opacity-100"
+              : "grid-rows-[0fr] opacity-80"
           )}
         >
           <div className="overflow-hidden">
-            <p className="mt-2 text-sm sm:text-[15px] leading-6 text-white/80">{item.answer}</p>
+            <p className="mt-2 text-sm sm:text-[15px] leading-6 text-white/80">
+              {item.answer}
+            </p>
             <div className="mt-3">
               {item.cta && (
                 <a
@@ -594,7 +683,7 @@ function FAQRow({
       <header className="px-3 sm:px-4 py-3">
         {showBadge && (
           <div className="mb-2 flex items-center gap-2 text-[10px] sm:text-xs uppercase tracking-[0.15em] text-white/50">
-            {item.tags.map(t => (
+            {item.tags.map((t) => (
               <span key={t} className="inline-flex items-center gap-1.5">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/40" />
                 {t}
@@ -610,7 +699,12 @@ function FAQRow({
           aria-controls={`${id}-panel`}
           className="group w-full flex items-start justify-between gap-3 text-left"
         >
-          <h3 className={clsx("text-base sm:text-lg font-semibold text-white", compact && "text-base")}>
+          <h3
+            className={clsx(
+              "text-base sm:text-lg font-semibold text-white",
+              compact && "text-base"
+            )}
+          >
             {item.question}
           </h3>
           <span
@@ -628,11 +722,15 @@ function FAQRow({
           id={`${id}-panel`}
           className={clsx(
             "grid transition-[grid-template-rows,opacity] duration-150 ease-out",
-            expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-70"
+            expanded
+              ? "grid-rows-[1fr] opacity-100"
+              : "grid-rows-[0fr] opacity-70"
           )}
         >
           <div className="overflow-hidden">
-            <p className="mt-2 text-sm sm:text-[15px] leading-6 text-white/75">{item.answer}</p>
+            <p className="mt-2 text-sm sm:text-[15px] leading-6 text-white/75">
+              {item.answer}
+            </p>
 
             <div className="mt-3 flex flex-wrap items-center gap-3">
               {item.cta && (
@@ -647,7 +745,7 @@ function FAQRow({
                 <div className="text-xs text-white/50">
                   Related:{" "}
                   {item.related
-                    .map(rid => (
+                    .map((rid) => (
                       <a
                         key={rid}
                         href={`#faq/${rid}`}
@@ -658,7 +756,10 @@ function FAQRow({
                       </a>
                     ))
                     .reduce(
-                      (acc: React.ReactNode[], curr, i) => (i ? [...acc, <span key={`sep-${i}`}> · </span>, curr] : [curr]),
+                      (acc: React.ReactNode[], curr, i) =>
+                        i
+                          ? [...acc, <span key={`sep-${i}`}> · </span>, curr]
+                          : [curr],
                       [] as React.ReactNode[]
                     )}
                 </div>
@@ -675,7 +776,8 @@ function EmptyState({ onReset }: { onReset: () => void }) {
   return (
     <div className="rounded-2xl panel px-4 py-8 text-center text-white/70">
       <p className="text-sm">
-        No results. Try <span className="text-white">“invoice”</span>, <span className="text-white">“visa”</span>, or{" "}
+        No results. Try <span className="text-white">“invoice”</span>,{" "}
+        <span className="text-white">“visa”</span>, or{" "}
         <span className="text-white">“Trip Builder”</span>.
       </p>
       <button
