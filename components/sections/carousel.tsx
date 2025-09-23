@@ -3,7 +3,6 @@
 
 import Image from "next/image";
 import React, { useEffect, useRef, useState } from "react";
-import { gsap } from "gsap";
 
 type Place = {
   id: string;
@@ -25,7 +24,7 @@ type CarouselProps = {
 
 export default function Carousel({
   id = "destinations",
-  title = "Top Picks",
+  title = "Choose Your Destination",
   items,
   darkOverlay = 0.25,
   overshootPx = 120,
@@ -36,6 +35,8 @@ export default function Carousel({
   const cardRefs = useRef<Array<HTMLDivElement | null>>([]);
   const centersRef = useRef<number[]>([]);
   const [active, setActive] = useState(0);
+  // Decouple pills from carousel card selection to avoid shared animation
+  const [pillActive, setPillActive] = useState(0);
   const [gutters, setGutters] = useState({ left: 0, right: 0 });
   const [dramatic, setDramatic] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -51,8 +52,6 @@ export default function Carousel({
   const pillsRef = useRef<HTMLDivElement | null>(null);
   const pillBtnRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [pillsH, setPillsH] = useState(0); // dynamic height of pills bar
-
-  const pointerRef = useRef<HTMLDivElement | null>(null);
 
   const prefersReduced =
     respectReducedMotion &&
@@ -138,13 +137,7 @@ export default function Carousel({
         const isMobile =
           typeof window !== "undefined" && window.innerWidth < 768;
         const baseIntensity = dramatic ? 1.0 : 0.65;
-        const blurMax = dramatic
-          ? isMobile
-            ? 2
-            : 3
-          : isMobile
-          ? 1
-          : 1.5;
+        const blurMax = dramatic ? (isMobile ? 2 : 3) : isMobile ? 1 : 1.5;
 
         for (let i = 0; i < cards.length; i++) {
           const el = cards[i];
@@ -232,7 +225,8 @@ export default function Carousel({
     const btn = pillBtnRefs.current[i];
     if (!bar || !btn) return;
     const left = btn.offsetLeft - bar.clientWidth / 2 + btn.clientWidth / 2;
-    bar.scrollTo({ left, behavior: prefersReduced ? "auto" : "smooth" });
+    // No animation on pills: set scroll position directly
+    bar.scrollLeft = left;
   };
 
   const whipTo = (idx: number) => {
@@ -301,14 +295,7 @@ export default function Carousel({
 
     const root = scrollerRef.current;
     const centers = centersRef.current;
-    if (!root || !centers.length || !pointerRef.current) return;
-
-    // Animate pointer to point right when roulette starts
-    gsap.to(pointerRef.current, {
-      rotation: 45, // Point to the right during roulette
-      duration: 0.5,
-      ease: "power2.out",
-    });
+    if (!root || !centers.length) return;
 
     const currentIndex = active;
     const totalItems = items.length;
@@ -329,14 +316,6 @@ export default function Carousel({
           setActive(targetIndex);
           centerIndex(targetIndex, 800);
           centerPill(targetIndex);
-
-          // Animate pointer back to pointing down with physics bounce
-          gsap.to(pointerRef.current, {
-            rotation: 0,
-            duration: 1.5,
-            ease: "elastic.out(1, 0.3)",
-            delay: 0.2,
-          });
 
           const tEnd = window.setTimeout(() => {
             setIsRouletting(false);
@@ -378,18 +357,6 @@ export default function Carousel({
       const variation = Math.random() * 0.3 - 0.15; // ±15% variation
       delay *= 1 + variation;
 
-      // Realistic pointer physics - wobble left and right with each step
-      if (pointerRef.current) {
-        const wobbleIntensity = Math.max(0.1, 1 - progress); // Less wobble as it slows
-        const wobbleDirection = currentStep % 2 === 0 ? 1 : -1;
-        const wobbleAmount = wobbleDirection * wobbleIntensity * 12; // moderate angle
-        gsap.to(pointerRef.current, {
-          rotation: 45 + wobbleAmount, // Base angle of 45°
-          duration: Math.min(delay / 1000, 0.3),
-          ease: "power1.out",
-        });
-      }
-
       setActive(nextIndex);
       centerIndex(nextIndex, Math.min(300, delay * 2));
 
@@ -422,10 +389,17 @@ export default function Carousel({
     }
   };
 
+  // Keep pills centered based on pillActive only
   useEffect(() => {
-    centerPill(active);
+    centerPill(pillActive);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
+  }, [pillActive]);
+
+  // Sync pillActive to active only when not rouletting (avoid animation chaining)
+  useEffect(() => {
+    if (!isRouletting) setPillActive(active);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, isRouletting]);
 
   return (
     <section
@@ -442,33 +416,13 @@ export default function Carousel({
               {title}
             </h2>
             <p
-              className="text-sm sm:text-base text-white/80 mt-1 drop-shadow-md"
+              className="mt-3 sm:mt-4 text-base sm:text-xl lg:text-2xl text-white/80 leading-relaxed max-w-2xl mx-auto drop-shadow-md"
               aria-live="polite"
             >
               {isRouletting
                 ? "🎲 Selecting destination..."
                 : "Discover your next adventure"}
             </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Roulette pointer */}
-      <div className="absolute top-[110px] sm:top-[130px] md:top-[150px] left-1/2 -translate-x-1/2 z-30">
-        <div
-          className={`transition-transform duration-300 ${
-            isRouletting ? "scale-110" : "scale-100"
-          }`}
-        >
-          <div className="relative flex items-center justify-center">
-            {/* triangle built with borders; color controlled by text-* and border-t-current */}
-            <div
-              ref={pointerRef}
-              className="w-0 h-0 drop-shadow-lg text-yellow-400 border-l-[8px] border-r-[8px] border-t-[28px] border-l-transparent border-r-transparent border-t-current"
-              style={{ transformOrigin: "50% 0%" }}
-            />
-            {/* glow */}
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full blur-sm bg-yellow-400/40" />
           </div>
         </div>
       </div>
@@ -560,7 +514,10 @@ export default function Carousel({
                 onLoad={() => handleImageLoad(p.id)}
               />
 
-              <div className="absolute inset-0 bg-black" style={{ opacity: overlay }} />
+              <div
+                className="absolute inset-0 bg-black"
+                style={{ opacity: overlay }}
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
               <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/30" />
 
@@ -634,46 +591,107 @@ export default function Carousel({
       </div>
 
       {/* Pills Navigation */}
-      <div className="absolute bottom-3 inset-x-0 z-20">
+      <div className="absolute bottom-3 inset-x-0 z-20 pb-6">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="relative">
-            {/* edge fades on mobile */}
-            <div className="pointer-events-none md:hidden absolute left-0 top-0 h-full w-8 bg-gradient-to-r from-black via-black/70 to-transparent z-10" />
-            <div className="pointer-events-none md:hidden absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-black via-black/70 to-transparent z-10" />
+            {/* MOBILE: Horizontal scroller */}
+            <div className="md:hidden">
+              {/* edge fades on mobile */}
+              <div className="pointer-events-none absolute left-0 top-0 h-full w-8 bg-gradient-to-r from-black via-black/70 to-transparent z-10" />
+              <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-black via-black/70 to-transparent z-10" />
 
-            <div
-              ref={pillsRef}
-              role="tablist"
-              aria-label="Destinations filter"
-              className=" flex flex-nowrap items-center gap-2 overflow-x-auto no-scrollbar py-1 snap-x snap-mandatory md:flex-wrap md:overflow-visible md:snap-none md:justify-center "
-            >
-              {items.map((p, i) => (
+              <div
+                ref={pillsRef}
+                role="tablist"
+                aria-label="Destinations filter"
+                className="flex flex-nowrap items-center gap-2 overflow-x-auto no-scrollbar py-1 snap-x snap-mandatory"
+              >
+                {items.map((p, i) => (
+                  <button
+                    key={p.id}
+                    ref={(el) => {
+                      pillBtnRefs.current[i] = el;
+                    }}
+                    onClick={() => {
+                      setPillActive(i);
+                      rouletteToDestination(i);
+                    }}
+                    role="tab"
+                    aria-selected={i === pillActive}
+                    aria-controls={`${id}-slide-${i}`}
+                    disabled={isRouletting}
+                    className={` relative snap-center whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium backdrop-blur-sm min-w-[80px] text-center touch-manipulation ${
+                      isRouletting ? "opacity-75" : ""
+                    } ${
+                      i === rouletteTarget && isRouletting
+                        ? "border-yellow-400 text-yellow-300 bg-yellow-400/20 shadow-lg shadow-yellow-400/50"
+                        : i === pillActive
+                        ? "border-white/80 text-white bg-transparent md:bg-transparent md:text-white md:border-white md:shadow-lg shadow-white/25"
+                        : "border-white/30 text-white/90 shadow-lg shadow-black/25"
+                    }`}
+                  >
+                    <span className="inline-block translate-y-[0.5px] tracking-wide">
+                      {p.title}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* DESKTOP: Two rows, centered with natural widths (no rigid grid) */}
+            {(() => {
+              const perRow = Math.ceil(items.length / 2) || 1;
+              const row1 = items.slice(0, perRow);
+              const row2 = items.slice(perRow);
+
+              const Pill = (p: Place, i: number) => (
                 <button
                   key={p.id}
-                  ref={(el) => {
-                    pillBtnRefs.current[i] = el;
+                  onClick={() => {
+                    setPillActive(i);
+                    rouletteToDestination(i);
                   }}
-                  onClick={() => rouletteToDestination(i)}
                   role="tab"
-                  aria-selected={i === active}
+                  aria-selected={i === pillActive}
                   aria-controls={`${id}-slide-${i}`}
                   disabled={isRouletting}
-                  className={` relative snap-center whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition-all duration-300 backdrop-blur-sm min-w-[80px] text-center hover:scale-105 active:scale-95 touch-manipulation ${
+                  className={` whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium backdrop-blur-sm min-w-[96px] text-center ${
                     isRouletting ? "opacity-75" : ""
                   } ${
                     i === rouletteTarget && isRouletting
-                      ? "border-yellow-400 text-yellow-300 bg-yellow-400/20 shadow-lg shadow-yellow-400/50 scale-110"
-                      : i === active
-                      ? "border-white/80 text-white bg-white/15 md:bg-white md:text-black md:border-white md:shadow-lg shadow-white/25 scale-105"
-                      : "border-white/30 text-white/90 hover:bg-white/10 hover:border-white/50 shadow-lg shadow-black/25"
+                      ? "border-yellow-400 text-yellow-300 bg-yellow-400/20 shadow-lg shadow-yellow-400/50"
+                      : i === pillActive
+                      ? "border-white/80 text-white bg-transparent md:bg-transparent md:text-white md:border-white md:shadow-lg shadow-white/25"
+                      : "border-white/30 text-white/90 shadow-lg shadow-black/25"
                   }`}
                 >
                   <span className="inline-block translate-y-[0.5px] tracking-wide">
                     {p.title}
                   </span>
                 </button>
-              ))}
-            </div>
+              );
+
+              return (
+                <div className="hidden md:block">
+                  <div className="space-y-2">
+                    <div
+                      className="flex flex-wrap justify-center gap-2"
+                      role="tablist"
+                      aria-label="Destinations filter row 1"
+                    >
+                      {row1.map((p, i) => Pill(p, i))}
+                    </div>
+                    <div
+                      className="flex flex-wrap justify-center gap-2"
+                      role="tablist"
+                      aria-label="Destinations filter row 2"
+                    >
+                      {row2.map((p, i) => Pill(p, i + row1.length))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>

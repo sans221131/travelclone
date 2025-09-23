@@ -1,7 +1,13 @@
 // components/how-it-works/DigitalDockingDivs.tsx
 "use client";
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -33,11 +39,31 @@ type DigitalDockingDivsProps = {
 };
 
 const DEFAULT_STEPS: Step[] = [
-  { id: "plan",    title: "Plan Precisely",   body: "Share goals, constraints, and rough dates. We map feasibility in 24–48h." },
-  { id: "curate",  title: "Curate Fast",      body: "Handpicked hotels, flights, and visa guidance matched to your constraints." },
-  { id: "quote",   title: "Quote Clearly",    body: "Crystal pricing. No mystery fees. You approve, we lock inventory." },
-  { id: "invoice", title: "Invoice Simply",   body: "You get an invoice ref. Pay by reference; we reconcile instantly." },
-  { id: "depart",  title: "Travel Confident", body: "Final confirmations, WhatsApp support, and live changes if needed." },
+  {
+    id: "plan",
+    title: "Plan Precisely",
+    body: "Share goals, constraints, and rough dates. We map feasibility in 24–48h.",
+  },
+  {
+    id: "curate",
+    title: "Curate Fast",
+    body: "Handpicked hotels, flights, and visa guidance matched to your constraints.",
+  },
+  {
+    id: "quote",
+    title: "Quote Clearly",
+    body: "Crystal pricing. No mystery fees. You approve, we lock inventory.",
+  },
+  {
+    id: "invoice",
+    title: "Invoice Simply",
+    body: "You get an invoice ref. Pay by reference; we reconcile instantly.",
+  },
+  {
+    id: "depart",
+    title: "Travel Confident",
+    body: "Final confirmations, WhatsApp support, and live changes if needed.",
+  },
 ];
 
 /** tiny util to build stable ref arrays */
@@ -61,14 +87,14 @@ export default function DigitalDockingDivs({
   const sectionRef = useRef<HTMLDivElement | null>(null);
 
   // refs per-step
-  const [shellRefs, setShell]   = makeRefArray<HTMLLIElement>(steps.length);
-  const [bandRefs, setBand]     = makeRefArray<HTMLDivElement>(steps.length);
-  const [fillRefs, setFill]     = makeRefArray<HTMLDivElement>(steps.length);
-  const [sweepRefs, setSweep]   = makeRefArray<HTMLDivElement>(steps.length);
+  const [shellRefs, setShell] = makeRefArray<HTMLLIElement>(steps.length);
+  const [bandRefs, setBand] = makeRefArray<HTMLDivElement>(steps.length);
+  const [fillRefs, setFill] = makeRefArray<HTMLDivElement>(steps.length);
+  const [sweepRefs, setSweep] = makeRefArray<HTMLDivElement>(steps.length);
   const [beaconRefs, setBeacon] = makeRefArray<HTMLDivElement>(steps.length);
-  const [glowRefs, setGlow]     = makeRefArray<HTMLDivElement>(steps.length);
-  const [badgeRefs, setBadge]   = makeRefArray<HTMLSpanElement>(steps.length);
-  const [textRefs, setText]     = makeRefArray<HTMLDivElement>(steps.length);
+  const [glowRefs, setGlow] = makeRefArray<HTMLDivElement>(steps.length);
+  const [badgeRefs, setBadge] = makeRefArray<HTMLSpanElement>(steps.length);
+  const [textRefs, setText] = makeRefArray<HTMLDivElement>(steps.length);
 
   // runtime guardrails - use state to avoid hydration mismatch
   const [clientSettings, setClientSettings] = useState({
@@ -78,19 +104,23 @@ export default function DigitalDockingDivs({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    
-    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+
+    const reduced =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
     const tiny = window.matchMedia?.("(max-width: 640px)")?.matches ?? false;
-    const highDPR = typeof window.devicePixelRatio === "number" && window.devicePixelRatio > 2;
+    const highDPR =
+      typeof window.devicePixelRatio === "number" &&
+      window.devicePixelRatio > 2;
     const bodyFlag = document.documentElement.dataset.lowfx === "1";
     const lowPower = tiny || highDPR || bodyFlag;
-    
+
     setClientSettings({ reduced, lowPower });
   }, []);
 
   const sweepOn = false; // Disabled light animation
-  const glowOn  = false; // Disabled light animation
-  const tiltOn  = hoverTilt && !clientSettings.reduced && !clientSettings.lowPower;
+  const glowOn = false; // Disabled light animation
+  const tiltOn =
+    hoverTilt && !clientSettings.reduced && !clientSettings.lowPower;
 
   // Use fixed pip count to avoid hydration mismatch
   const pipCountEffective = Math.max(8, pipCount);
@@ -110,13 +140,16 @@ export default function DigitalDockingDivs({
       if (validBandRefs.length === 0) return;
 
       // Make all elements visible immediately (static appearance)
-      if (validBandRefs.length > 0) gsap.set(validBandRefs, { opacity: 1, y: 0 });
-      if (validFillRefs.length > 0) gsap.set(validFillRefs, { width: 0, opacity: 0.7 });
+      if (validBandRefs.length > 0)
+        gsap.set(validBandRefs, { opacity: 1, y: 0 });
+      if (validFillRefs.length > 0)
+        gsap.set(validFillRefs, { width: 0, opacity: 0.7 });
       if (validBeaconRefs.length > 0) gsap.set(validBeaconRefs, { opacity: 1 });
-      
+
       // Hide sweep and glow initially
       if (validSweepRefs.length > 0) gsap.set(validSweepRefs, { opacity: 0 });
-      if (!glowOn && validGlowRefs.length > 0) gsap.set(validGlowRefs, { opacity: 0 });
+      if (!glowOn && validGlowRefs.length > 0)
+        gsap.set(validGlowRefs, { opacity: 0 });
 
       // Create a single scroll-based animation for the entire section
       const masterTL = gsap.timeline({
@@ -125,65 +158,68 @@ export default function DigitalDockingDivs({
           start: "top bottom",
           end: "bottom top",
           scrub: 1, // smooth scrubbing
-          onUpdate: self => {
+          onUpdate: (self) => {
             const progress = self.progress;
-            
+
             // Update each step based on global progress
             bandRefs.forEach((band, i) => {
               if (!band) return;
-              
+
               const fill = fillRefs[i];
               const sweep = sweepRefs[i];
               const beacon = beaconRefs[i];
               const glow = glowRefs[i];
-              
+
               // Determine if this step should be illuminated
               const stepStart = i / steps.length;
               const stepEnd = (i + 1) / steps.length;
-              const stepProgress = Math.max(0, Math.min(1, (progress - stepStart) / (stepEnd - stepStart)));
-              
+              const stepProgress = Math.max(
+                0,
+                Math.min(1, (progress - stepStart) / (stepEnd - stepStart))
+              );
+
               // Animate fill based on step progress - with null check
               if (fill) {
-                gsap.set(fill, { 
+                gsap.set(fill, {
                   width: `${stepProgress * 100}%`,
-                  opacity: stepProgress > 0 ? 0.7 : 0.3
+                  opacity: stepProgress > 0 ? 0.7 : 0.3,
                 });
               }
-              
+
               // Animate beacon position - with null check
               if (beacon) {
                 gsap.set(beacon, {
                   left: `${stepProgress * 100}%`,
                   opacity: stepProgress > 0.1 ? 1 : 0.3,
-                  scale: stepProgress > 0.1 ? 1 : 0.8
+                  scale: stepProgress > 0.1 ? 1 : 0.8,
                 });
               }
-              
+
               // Animate sweep highlight - with null check
               if (sweep && sweepOn && stepProgress > 0) {
                 gsap.set(sweep, {
                   xPercent: stepProgress * 120 - 20,
-                  opacity: stepProgress > 0.1 ? 0.4 : 0
+                  opacity: stepProgress > 0.1 ? 0.4 : 0,
                 });
               }
-              
+
               // Animate glow - with null check
               if (glow && glowOn && stepProgress > 0) {
                 gsap.set(glow, {
                   xPercent: stepProgress * 150 - 50,
-                  opacity: stepProgress > 0.1 ? 0.6 : 0
+                  opacity: stepProgress > 0.1 ? 0.6 : 0,
                 });
               }
             });
-          }
-        }
+          },
+        },
       });
 
       // Optional desktop tilt
       if (tiltOn && window.matchMedia("(hover: hover)").matches) {
         bandRefs.forEach((band) => {
           if (!band) return;
-          
+
           let rect = band.getBoundingClientRect();
           const ro = new ResizeObserver(() => {
             rect = band.getBoundingClientRect();
@@ -203,7 +239,7 @@ export default function DigitalDockingDivs({
             band.style.setProperty("--rx", "0deg");
             band.style.setProperty("--ry", "0deg");
           };
-          
+
           band.addEventListener("pointerenter", onEnter, { passive: true });
           band.addEventListener("pointermove", onMove, { passive: true });
           band.addEventListener("pointerleave", onLeave, { passive: true });
@@ -238,9 +274,14 @@ export default function DigitalDockingDivs({
           id: "runway-snap",
           trigger: sectionRef.current!,
           start: "top top",
-          end: () => `+=${Math.max(1, sectionRef.current!.scrollHeight - window.innerHeight)}`,
+          end: () =>
+            `+=${Math.max(
+              1,
+              sectionRef.current!.scrollHeight - window.innerHeight
+            )}`,
           snap: {
-            snapTo: (value) => (stops.length ? gsap.utils.snap(stops, value) : value),
+            snapTo: (value) =>
+              stops.length ? gsap.utils.snap(stops, value) : value,
             duration: 0.3,
             ease: "power1.inOut",
           },
@@ -296,11 +337,11 @@ export default function DigitalDockingDivs({
         <header className="mb-6 sm:mb-7 lg:mb-9 text-center">
           <h2
             id="howitworks-heading"
-            className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold tracking-tight"
+            className="text-6xl font-semibold tracking-tight"
           >
             {heading}
           </h2>
-          <p className="mt-2 text-xs sm:text-sm lg:text-base text-zinc-400 max-w-2xl mx-auto">
+          <p className="mt-2 text-base sm:text-xl lg:text-2xl text-zinc-400 max-w-2xl mx-auto">
             Five phases. The runway lights guide you from left to right.
           </p>
         </header>
@@ -411,7 +452,10 @@ export default function DigitalDockingDivs({
                     </h3>
                   </div>
 
-                  <div ref={setText(i)} className="text-xs sm:text-[14px] lg:text-[15px] text-zinc-300 min-w-0">
+                  <div
+                    ref={setText(i)}
+                    className="text-xs sm:text-[14px] lg:text-[15px] text-zinc-300 min-w-0"
+                  >
                     {s.body}
                     {s.href ? (
                       <a
