@@ -1,1 +1,0 @@
-self.__NEXT_FONT_MANIFEST="{\n  \"app\": {\n    \"[project]/app/page\": [\n      \"static/media/dunbar_text_regular-s.p.fa8451b7.woff2\",\n      \"static/media/dunbar_text_regular-s.p.b1c5dd4a.woff\"\n    ]\n  },\n  \"appUsingSizeAdjust\": true,\n  \"pages\": {},\n  \"pagesUsingSizeAdjust\": false\n}"
