@@ -1,7 +1,7 @@
 // components/how-it-works/DigitalDockingDivs.tsx
 "use client";
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -70,38 +70,53 @@ export default function DigitalDockingDivs({
   const [badgeRefs, setBadge]   = makeRefArray<HTMLSpanElement>(steps.length);
   const [textRefs, setText]     = makeRefArray<HTMLDivElement>(steps.length);
 
-  // runtime guardrails
-  const reduced = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
-  }, []);
+  // runtime guardrails - use state to avoid hydration mismatch
+  const [clientSettings, setClientSettings] = useState({
+    reduced: false,
+    lowPower: false,
+  });
 
-  const lowPower = useMemo(() => {
-    if (typeof window === "undefined") return false;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
     const tiny = window.matchMedia?.("(max-width: 640px)")?.matches ?? false;
     const highDPR = typeof window.devicePixelRatio === "number" && window.devicePixelRatio > 2;
     const bodyFlag = document.documentElement.dataset.lowfx === "1";
-    return tiny || highDPR || bodyFlag;
+    const lowPower = tiny || highDPR || bodyFlag;
+    
+    setClientSettings({ reduced, lowPower });
   }, []);
 
-  const sweepOn = sweepEnabled && !reduced && !lowPower;
-  const glowOn  = glowEnabled && !reduced && !lowPower;
-  const tiltOn  = hoverTilt && !reduced && !lowPower;
+  const sweepOn = false; // Disabled light animation
+  const glowOn  = false; // Disabled light animation
+  const tiltOn  = hoverTilt && !clientSettings.reduced && !clientSettings.lowPower;
 
-  const pipCountEffective = Math.max(8, Math.round(pipCount * (lowPower ? 0.6 : 1)));
+  // Use fixed pip count to avoid hydration mismatch
+  const pipCountEffective = Math.max(8, pipCount);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!sectionRef.current) return;
 
     const ctx = gsap.context(() => {
+      // Filter out null refs before setting properties
+      const validBandRefs = bandRefs.filter(Boolean);
+      const validFillRefs = fillRefs.filter(Boolean);
+      const validBeaconRefs = beaconRefs.filter(Boolean);
+      const validSweepRefs = sweepRefs.filter(Boolean);
+      const validGlowRefs = glowRefs.filter(Boolean);
+
+      // Only proceed if we have valid refs
+      if (validBandRefs.length === 0) return;
+
       // Make all elements visible immediately (static appearance)
-      gsap.set(bandRefs, { opacity: 1, y: 0 });
-      gsap.set(fillRefs, { width: 0, opacity: 0.7 });
-      gsap.set(beaconRefs, { opacity: 1 });
+      if (validBandRefs.length > 0) gsap.set(validBandRefs, { opacity: 1, y: 0 });
+      if (validFillRefs.length > 0) gsap.set(validFillRefs, { width: 0, opacity: 0.7 });
+      if (validBeaconRefs.length > 0) gsap.set(validBeaconRefs, { opacity: 1 });
       
       // Hide sweep and glow initially
-      gsap.set(sweepRefs, { opacity: 0 });
-      if (!glowOn) gsap.set(glowRefs, { opacity: 0 });
+      if (validSweepRefs.length > 0) gsap.set(validSweepRefs, { opacity: 0 });
+      if (!glowOn && validGlowRefs.length > 0) gsap.set(validGlowRefs, { opacity: 0 });
 
       // Create a single scroll-based animation for the entire section
       const masterTL = gsap.timeline({
@@ -127,7 +142,7 @@ export default function DigitalDockingDivs({
               const stepEnd = (i + 1) / steps.length;
               const stepProgress = Math.max(0, Math.min(1, (progress - stepStart) / (stepEnd - stepStart)));
               
-              // Animate fill based on step progress
+              // Animate fill based on step progress - with null check
               if (fill) {
                 gsap.set(fill, { 
                   width: `${stepProgress * 100}%`,
@@ -135,7 +150,7 @@ export default function DigitalDockingDivs({
                 });
               }
               
-              // Animate beacon position
+              // Animate beacon position - with null check
               if (beacon) {
                 gsap.set(beacon, {
                   left: `${stepProgress * 100}%`,
@@ -144,7 +159,7 @@ export default function DigitalDockingDivs({
                 });
               }
               
-              // Animate sweep highlight
+              // Animate sweep highlight - with null check
               if (sweep && sweepOn && stepProgress > 0) {
                 gsap.set(sweep, {
                   xPercent: stepProgress * 120 - 20,
@@ -152,7 +167,7 @@ export default function DigitalDockingDivs({
                 });
               }
               
-              // Animate glow
+              // Animate glow - with null check
               if (glow && glowOn && stepProgress > 0) {
                 gsap.set(glow, {
                   xPercent: stepProgress * 150 - 50,
@@ -251,7 +266,7 @@ export default function DigitalDockingDivs({
       ctx.revert();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [steps.length, sweepOn, glowOn, tiltOn, snap, reduced]);
+  }, [steps.length, sweepOn, glowOn, tiltOn, snap, clientSettings.reduced]);
 
   // simple pip renderer
   const renderPips = (prefix: string) =>
@@ -266,7 +281,7 @@ export default function DigitalDockingDivs({
     <section
       ref={sectionRef}
       aria-labelledby="howitworks-heading"
-      className="relative isolate overflow-x-hidden bg-zinc-950 text-zinc-100"
+      className="relative isolate bg-zinc-950 text-zinc-100"
     >
       {/* soft backdrop + glow bar */}
       <div
@@ -302,9 +317,9 @@ export default function DigitalDockingDivs({
                 className={[
                   "absolute inset-0 group rounded-xl sm:rounded-2xl lg:rounded-[26px] border border-white/10",
                   "bg-zinc-900/40 px-3 sm:px-4 lg:px-5 py-3 sm:py-3.5 lg:py-4.5",
-                  "transition-transform duration-200 will-change-transform [contain:layout_paint_style]",
+                  "transition-transform duration-200 will-change-transform",
                   "[transform:rotateX(var(--rx,0deg))_rotateY(var(--ry,0deg))] [transform-style:preserve-3d]",
-                  lowPower ? "" : "backdrop-blur",
+                  clientSettings.lowPower ? "" : "backdrop-blur",
                   "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05),inset_0_1px_0_rgba(255,255,255,0.05),inset_0_-1px_0_rgba(0,0,0,0.45)]",
                 ].join(" ")}
               >
@@ -380,23 +395,23 @@ export default function DigitalDockingDivs({
 
                 {/* content grid */}
                 <div
-                  className="relative grid items-center gap-x-2 sm:gap-x-3 lg:gap-x-6"
+                  className="relative grid items-center gap-x-2 sm:gap-x-3 lg:gap-x-6 overflow-visible"
                   style={{ gridTemplateColumns: "var(--col-spec)" }}
                 >
                   <span
                     ref={setBadge(i)}
-                    className="inline-flex h-6 sm:h-7 lg:h-8 items-center justify-center rounded-lg border border-white/15 bg-white/10 px-1.5 sm:px-2 text-[9px] sm:text-[10px] lg:text-[11px] font-semibold tracking-wide text-white"
+                    className="inline-flex h-6 sm:h-7 lg:h-8 items-center justify-center rounded-lg border border-white/15 bg-white/10 px-1.5 sm:px-2 text-[9px] sm:text-[10px] lg:text-[11px] font-semibold tracking-wide text-white flex-shrink-0"
                   >
                     STEP {i + 1}
                   </span>
 
-                  <div className="leading-tight text-white">
+                  <div className="leading-tight text-white flex-shrink-0">
                     <h3 className="text-sm sm:text-[16px] md:text-[18px] lg:text-[20px] font-semibold">
                       {s.title}
                     </h3>
                   </div>
 
-                  <div ref={setText(i)} className="text-xs sm:text-[14px] lg:text-[15px] text-zinc-300">
+                  <div ref={setText(i)} className="text-xs sm:text-[14px] lg:text-[15px] text-zinc-300 min-w-0">
                     {s.body}
                     {s.href ? (
                       <a
@@ -417,21 +432,21 @@ export default function DigitalDockingDivs({
       {/* responsive column spec */}
       <style jsx>{`
         :global(section[aria-labelledby="howitworks-heading"]) {
-          --col-spec: 60px minmax(120px, 180px) 1fr;
+          --col-spec: 60px minmax(100px, 160px) 1fr;
         }
         @media (min-width: 640px) {
           :global(section[aria-labelledby="howitworks-heading"]) {
-            --col-spec: 74px minmax(150px, 220px) 1fr;
+            --col-spec: 74px minmax(120px, 180px) 1fr;
           }
         }
         @media (min-width: 1024px) {
           :global(section[aria-labelledby="howitworks-heading"]) {
-            --col-spec: 86px minmax(170px, 240px) 1fr;
+            --col-spec: 86px minmax(140px, 200px) 1fr;
           }
         }
         @media (min-width: 1280px) {
           :global(section[aria-labelledby="howitworks-heading"]) {
-            --col-spec: 92px minmax(190px, 280px) 1fr;
+            --col-spec: 92px minmax(160px, 240px) 1fr;
           }
         }
       `}</style>
