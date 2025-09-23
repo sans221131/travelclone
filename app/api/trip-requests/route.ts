@@ -1,79 +1,76 @@
 // app/api/trip-requests/route.ts
-import { NextResponse } from "next/server";
+export const runtime = "edge";
+
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { tripRequests } from "@/db/schema";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
-    // Validate required fields
-    const requiredFields = [
-      'origin',
-      'destination', 
-      'nationality',
-      'startDate',
-      'endDate',
-      'adults',
-      'airlinePreference',
-      'hotelPreference',
-      'flightClass',
-      'visaStatus',
-      'passengerName',
-      'email',
-      'phoneCountryCode',
-      'phoneNumber'
-    ];
 
-    for (const field of requiredFields) {
-      if (!body[field]) {
+    // basic presence check; swap for zod later if you want stricter types
+    const required = [
+      "origin",
+      "destination",
+      "nationality",
+      "startDate",
+      "endDate",
+      "adults",
+      "airlinePreference",
+      "hotelPreference",
+      "flightClass",
+      "visaStatus",
+      "passengerName",
+      "email",
+      "phoneCountryCode",
+      "phoneNumber",
+    ] as const;
+
+    for (const key of required) {
+      if (!body[key]) {
         return NextResponse.json(
-          { error: `Missing required field: ${field}` },
+          { error: `Missing required field: ${key}` },
           { status: 400 }
         );
       }
     }
 
-    // Insert into database
-    const [newTripRequest] = await db.insert(tripRequests).values({
-      origin: body.origin,
-      destination: body.destination,
-      nationality: body.nationality,
-      startDate: body.startDate,
-      endDate: body.endDate,
-      adults: body.adults,
-      kids: body.kids || 0,
-      airlinePreference: body.airlinePreference,
-      hotelPreference: body.hotelPreference,
-      flightClass: body.flightClass,
-      visaStatus: body.visaStatus,
-      passengerName: body.passengerName,
-      email: body.email,
-      phoneCountryCode: body.phoneCountryCode,
-      phoneNumber: body.phoneNumber,
-    }).returning();
+    // Insert; Drizzle pg `date` accepts 'YYYY-MM-DD' strings
+    const [created] = await db
+      .insert(tripRequests)
+      .values({
+        origin: body.origin,
+        destination: body.destination,
+        nationality: body.nationality,
+        startDate: body.startDate, // 'YYYY-MM-DD'
+        endDate: body.endDate,     // 'YYYY-MM-DD'
+        adults: body.adults,
+        kids: body.kids ?? 0,
+        airlinePreference: body.airlinePreference,
+        hotelPreference: body.hotelPreference,
+        flightClass: body.flightClass,
+        visaStatus: body.visaStatus,
+        passengerName: body.passengerName,
+        email: body.email,
+        phoneCountryCode: body.phoneCountryCode,
+        phoneNumber: body.phoneNumber,
+      })
+      .returning();
 
-    return NextResponse.json(newTripRequest, { status: 201 });
-  } catch (error) {
-    console.error('Error creating trip request:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json(created, { status: 201 });
+  } catch (err) {
+    console.error("POST /api/trip-requests error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-export async function GET() {
+export async function GET(_req: NextRequest) {
   try {
-    const allTripRequests = await db.select().from(tripRequests);
-    return NextResponse.json(allTripRequests);
-  } catch (error) {
-    console.error('Error fetching trip requests:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    const rows = await db.select().from(tripRequests);
+    return NextResponse.json(rows, { status: 200 });
+  } catch (err) {
+    console.error("GET /api/trip-requests error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-
-export const runtime = "edge";
