@@ -1,1 +1,88 @@
 node_modules
+# ------------------------------
+# Node basics
+# ------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# ------------------------------
+# Next.js build artifacts
+# ------------------------------
+.next/
+.next/cache/
+.next-turbo/
+out/
+dist/
+
+# TypeScript
+*.tsbuildinfo
+
+# Compilers / bundlers
+.swc/
+.turbo/
+
+# ------------------------------
+# Cloudflare / Workers / Pages
+# ------------------------------
+# Wrangler local state and Miniflare junk
+.wrangler/
+**/.dev.vars           # secrets for `wrangler dev` (keep out of git)
+.mf/
+.miniflare*
+# If you keep any example secrets file, commit that explicitly:
+!.dev.vars.example
+
+# NOTE: keep your wrangler config in git:
+# wrangler.toml
+
+# ------------------------------
+# Env files (keep examples)
+# ------------------------------
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# ------------------------------
+# Testing / coverage
+# ------------------------------
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+cypress/videos/
+cypress/screenshots/
+
+# ------------------------------
+# Lint/cache
+# ------------------------------
+.eslintcache
+.cache/
+
+# ------------------------------
+# Framework odds & ends
+# ------------------------------
+.vercel/              # if you ever test locally with that tool
+.storybook-out/
+storybook-static/
+
+# ------------------------------
+# DB/ORM scratch (adjust if used)
+# ------------------------------
+*.sqlite
+*.sqlite-journal
+prisma/*.db
+prisma/*.db-journal
+
+# ------------------------------
+# Editors / OS fluff
+# ------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
