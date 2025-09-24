@@ -294,7 +294,7 @@ export default async function ReceiptPage(props: {
 
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/activities/${a.id}`}
+                          href={`/activities/${a.id}?tripId=${tr.id}`}
                           className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/20"
                         >
                           View
