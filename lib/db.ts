@@ -191,3 +191,29 @@ export async function getActivitiesForReceipt(
 
   return { selected, suggestions };
 }
+
+/* ------------ Single Activity ------------ */
+/**
+ * Get a single activity by ID
+ */
+export async function getActivityById(id: string): Promise<Activity | null> {
+  try {
+    console.log("getActivityById called with id:", id);
+    
+    const [activity] = await db
+      .select()
+      .from(activities)
+      .where(and(
+        eq(activities.id, id),
+        eq(activities.isActive, true)
+      ))
+      .limit(1);
+
+    console.log("getActivityById result:", activity ? "found" : "not found");
+    return activity || null;
+  } catch (error) {
+    console.error("Error fetching activity by ID:", error);
+    console.error("Query parameters:", { id });
+    return null;
+  }
+}
